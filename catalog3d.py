@@ -32,6 +32,8 @@ import json
 import base64
 import shutil
 import zipfile
+import platform
+import subprocess
 import threading
 import webbrowser
 import xml.etree.ElementTree as ET
@@ -49,6 +51,25 @@ MONEDA            = "MXN"
 # Carpeta por defecto (se puede pasar otra como argumento)
 CARPETA_DEFECTO   = Path.home() / "Desktop" / "own design 3d"
 CARPETA_DESCARGAS = Path.home() / "Downloads"
+
+# Rutas donde puede estar instalado Bambu Studio (se usa la primera que exista).
+# Si ninguna existe, se abre el .3mf con la app por defecto del sistema.
+APPS_BAMBU = {
+    "Darwin": [
+        "/Applications/BambuStudio.app",
+        "/Applications/Bambu Studio.app",
+        str(Path.home() / "Applications" / "BambuStudio.app"),
+    ],
+    "Windows": [
+        r"C:\Program Files\Bambu Studio\bambu-studio.exe",
+        r"C:\Program Files (x86)\Bambu Studio\bambu-studio.exe",
+    ],
+    "Linux": [
+        "/usr/bin/bambu-studio",
+        "/usr/local/bin/bambu-studio",
+        "/opt/bambu-studio/bambu-studio",
+    ],
+}
 
 
 # ----------------------------------------------------------
@@ -300,6 +321,88 @@ def mover_desde_descargas(carpeta_descargas: Path, carpeta_destino: Path, archiv
 
 
 # ----------------------------------------------------------
+#  ACCIONES EN LOTE
+# ----------------------------------------------------------
+def _lista_archivos(data):
+    """Saca una lista limpia de rutas relativas del cuerpo de la petición."""
+    archivos = data.get("archivos")
+    if not isinstance(archivos, list):
+        return []
+    return [a for a in archivos if isinstance(a, str) and a.strip()]
+
+
+def eliminar_varios(carpeta: Path, archivos):
+    """Elimina varios .3mf. Devuelve una lista con el resultado de cada uno,
+    para que la galería sepa cuáles quitar y cuáles fallaron."""
+    return [dict(zip(("archivo", "ok", "mensaje"), (a,) + eliminar(carpeta, a)))
+            for a in archivos]
+
+
+def mover_varios(carpeta_descargas: Path, carpeta_destino: Path, archivos):
+    """Mueve varios .3mf de Descargas a la carpeta de diseños."""
+    resultados = []
+    for a in archivos:
+        ok, msg, final = mover_desde_descargas(carpeta_descargas, carpeta_destino, a)
+        resultados.append({"archivo": a, "ok": ok,
+                           "mensaje": msg, "nombre_final": final})
+    return resultados
+
+
+# ----------------------------------------------------------
+#  ABRIR EN BAMBU STUDIO
+# ----------------------------------------------------------
+def _ruta_bambu():
+    """Devuelve la ruta de Bambu Studio instalada, o None si no se encuentra."""
+    for candidata in APPS_BAMBU.get(platform.system(), []):
+        if Path(candidata).exists():
+            return candidata
+    return None
+
+
+def abrir_en_bambu(carpeta: Path, archivo: str):
+    """Abre un .3mf de 'carpeta' en Bambu Studio (o en la app por defecto
+    del sistema si no se encuentra instalado). Devuelve (ok, mensaje)."""
+    ruta = _resolver_relativo(carpeta, archivo)
+    if ruta is None:
+        return (False, "Ruta fuera de la carpeta")
+    if ruta.suffix.lower() != ".3mf":
+        return (False, "Solo se pueden abrir archivos .3mf")
+    if not ruta.exists():
+        return (False, "El archivo ya no existe")
+
+    app = _ruta_bambu()
+    sistema = platform.system()
+    try:
+        if sistema == "Darwin":
+            cmd = ["open", "-a", app, str(ruta)] if app else ["open", str(ruta)]
+            subprocess.run(cmd, check=True,
+                           stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+        elif sistema == "Windows":
+            if app:
+                subprocess.Popen([app, str(ruta)])
+            else:
+                os.startfile(str(ruta))  # noqa: F821  (solo existe en Windows)
+        else:  # Linux
+            cmd = [app, str(ruta)] if app else ["xdg-open", str(ruta)]
+            subprocess.Popen(cmd,
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except subprocess.CalledProcessError as e:
+        detalle = (e.stderr or b"").decode("utf-8", "replace").strip()
+        return (False, detalle or "No se pudo abrir el archivo")
+    except FileNotFoundError:
+        return (False, "No se encontró Bambu Studio ni una app por defecto")
+    except Exception as e:
+        return (False, str(e))
+
+    return (True, "Abriendo en Bambu Studio" if app else "Abriendo con la app por defecto")
+
+
+def nombre_app():
+    """Etiqueta para los botones de la galería."""
+    return "Bambu Studio" if _ruta_bambu() else "el visor del sistema"
+
+
+# ----------------------------------------------------------
 #  PÁGINA HTML (galería)
 # ----------------------------------------------------------
 def pagina_html(carpeta: Path):
@@ -340,9 +443,15 @@ def pagina_html(carpeta: Path):
         transition:transform .12s ease,box-shadow .12s ease}
   .card:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.06)}
   .thumb{aspect-ratio:1/1;background:#efeae2 center/cover no-repeat;
-         display:flex;align-items:center;justify-content:center}
+         display:flex;align-items:center;justify-content:center;
+         position:relative;cursor:pointer}
   .thumb img{width:100%;height:100%;object-fit:cover;display:block}
   .thumb .noimg{color:var(--muted);font-size:13px}
+  .thumb .abrir{position:absolute;inset:0;display:flex;align-items:center;
+                justify-content:center;background:rgba(43,42,39,.55);color:#fff;
+                font-size:13px;font-weight:600;letter-spacing:.2px;
+                opacity:0;transition:opacity .15s}
+  .thumb:hover .abrir{opacity:1}
   .body{padding:14px;display:flex;flex-direction:column;gap:10px}
   .nombre{display:flex;gap:6px}
   .nombre input{flex:1;min-width:0;border:1px solid transparent;border-radius:8px;padding:6px 8px;
@@ -358,6 +467,8 @@ def pagina_html(carpeta: Path):
   .btn.del:hover{border-color:#a53b3b;background:#fbeaea}
   .btn.mover{border-color:var(--accent);color:var(--accent);width:100%;text-align:center;font-weight:600}
   .btn.mover:hover{background:var(--accent);color:#fff}
+  .btn.abrir{width:100%;text-align:center;font-weight:600}
+  .btn.abrir:hover{background:var(--ink);color:#fff;border-color:var(--ink)}
   .nombre.solo span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
                      padding:6px 8px;font-size:15px;font-weight:600}
   .meta{display:flex;gap:8px;flex-wrap:wrap}
@@ -367,10 +478,28 @@ def pagina_html(carpeta: Path):
   .chip.mat{background:#eae6f0;color:#5b4c78}
   .chip.warn{background:#fbeaea;color:#a53b3b}
   .chip.folder{background:#eef1f5;color:#4a5b73}
+  .card.sel{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent) inset}
+  .selbox{position:absolute;top:10px;left:10px;z-index:2;background:rgba(255,253,250,.9);
+          border-radius:8px;padding:4px;line-height:0;box-shadow:0 1px 4px rgba(0,0,0,.12)}
+  .selbox input{width:20px;height:20px;margin:0;cursor:pointer;accent-color:var(--accent)}
+  .barra{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(80px);
+         background:var(--ink);color:#fff;border-radius:14px;padding:10px 14px;
+         display:flex;gap:10px;align-items:center;font-size:14px;z-index:20;
+         box-shadow:0 10px 30px rgba(0,0,0,.22);opacity:0;pointer-events:none;
+         transition:opacity .18s,transform .18s;flex-wrap:wrap;max-width:92vw}
+  .barra.show{opacity:1;transform:translateX(-50%) translateY(0);pointer-events:auto}
+  .barra b{font-weight:600}
+  .barra .btn{background:transparent;color:#fff;border-color:rgba(255,255,255,.35)}
+  .barra .btn:hover{background:rgba(255,255,255,.14);color:#fff;border-color:#fff}
+  .barra .btn.peligro{border-color:rgba(255,150,150,.5);color:#ffb4b4}
+  .barra .btn.peligro:hover{background:#a53b3b;color:#fff;border-color:#a53b3b}
+  .barra .btn.mover{width:auto;border-color:rgba(255,255,255,.35);color:#fff}
+  .barra .btn.mover:hover{background:var(--accent);border-color:var(--accent);color:#fff}
   .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(40px);
          background:var(--ink);color:#fff;padding:10px 18px;border-radius:10px;font-size:14px;
          opacity:0;transition:.25s;pointer-events:none}
   .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  body.conbarra .toast{bottom:96px}
   .empty{text-align:center;color:var(--muted);padding:80px 20px}
 </style>
 </head>
@@ -386,12 +515,11 @@ def pagina_html(carpeta: Path):
   </div>
   <div class="controls">
     <div class="stat">Piezas: <b id="total">0</b></div>
-    <div class="stat">Peso total: <b id="pesoTotal">0 g</b></div>
-    <div class="stat">Costo total: <b id="costoTotal">0</b></div>
     <div class="field">
       <label>Precio filamento / kg</label>
       <input id="precio" type="number" min="0" step="10" value="350">
     </div>
+    <button class="btn" onclick="alternarTodo()" id="btnTodo">☑ Seleccionar todo</button>
     <button class="btn" onclick="cargar()">↻ Recargar</button>
   </div>
 </header>
@@ -401,16 +529,66 @@ def pagina_html(carpeta: Path):
     No se encontraron archivos .3mf.
   </div>
 </main>
+<div class="barra" id="barra">
+  <b id="barraCuenta">0 seleccionados</b>
+  <button class="btn mover" id="barraMover" onclick="moverSeleccionados()">→ Mover a mi carpeta</button>
+  <button class="btn peligro" onclick="eliminarSeleccionados()">🗑 Eliminar</button>
+  <button class="btn" onclick="limpiarSeleccion()">Cancelar</button>
+</div>
 <div class="toast" id="toast"></div>
 
 <script>
 const MONEDA = "__MONEDA__";
+const APP_NOMBRE = "__APP_NOMBRE__";
 let disenosMios = [];
 let disenosDescargas = [];
 let descargasCargadas = false;
 let vista = 'mios';
 
 function activos(){ return vista==='mios' ? disenosMios : disenosDescargas; }
+
+// Selección múltiple: se guarda por vista y por ruta de archivo, así
+// sobrevive a los re-render y no se mezcla entre pestañas.
+const seleccion = {mios: new Set(), descargas: new Set()};
+function selActual(){ return seleccion[vista]; }
+
+function alternarSel(i, marcado){
+  const d = activos()[i];
+  if(!d) return;
+  if(marcado) selActual().add(d.archivo); else selActual().delete(d.archivo);
+  render();
+}
+
+function alternarTodo(){
+  const lista = activos();
+  const sel = selActual();
+  if(sel.size === lista.length && lista.length){ sel.clear(); }
+  else { lista.forEach(d => sel.add(d.archivo)); }
+  render();
+}
+
+function limpiarSeleccion(){ selActual().clear(); render(); }
+
+/* Tras recargar del disco, olvida lo seleccionado que ya no existe. */
+function purgarSeleccion(clave, lista){
+  const vivos = new Set(lista.map(d => d.archivo));
+  seleccion[clave].forEach(a => { if(!vivos.has(a)) seleccion[clave].delete(a); });
+}
+
+function actualizarBarra(){
+  const n = selActual().size;
+  const total = activos().length;
+  const barra = document.getElementById('barra');
+  barra.classList.toggle('show', n > 0);
+  document.body.classList.toggle('conbarra', n > 0);
+  document.getElementById('barraCuenta').textContent =
+    n === 1 ? '1 seleccionado' : n + ' seleccionados';
+  // Mover solo tiene sentido desde Descargas
+  document.getElementById('barraMover').style.display =
+    vista === 'descargas' ? '' : 'none';
+  document.getElementById('btnTodo').textContent =
+    (n === total && total) ? '☐ Quitar selección' : '☑ Seleccionar todo';
+}
 
 function fmtCosto(n){
   return new Intl.NumberFormat('es-MX',{style:'currency',currency:MONEDA,
@@ -426,21 +604,27 @@ function render(){
   if(!disenos.length){ empty.style.display='block'; }
   else empty.style.display='none';
 
-  let pesoTot = 0, costoTot = 0;
   const precio = precioKg();
 
   disenos.forEach((d, i) => {
     const peso = d.peso_g;
     const costo = (peso!=null) ? (peso/1000*precio) : null;
-    if(peso!=null) pesoTot += peso;
-    if(costo!=null) costoTot += costo;
+
+    const marcado = selActual().has(d.archivo);
 
     const card = document.createElement('div');
-    card.className = 'card';
+    card.className = 'card' + (marcado ? ' sel' : '');
 
-    const thumb = d.miniatura
-      ? `<div class="thumb"><img src="${d.miniatura}" alt=""></div>`
-      : `<div class="thumb"><span class="noimg">sin miniatura</span></div>`;
+    const interior = d.miniatura
+      ? `<img src="${d.miniatura}" alt="">`
+      : `<span class="noimg">sin miniatura</span>`;
+    const thumb = `<div class="thumb" onclick="abrir(${i})" title="Abrir en ${APP_NOMBRE}">
+        <label class="selbox" onclick="event.stopPropagation()" title="Seleccionar">
+          <input type="checkbox" ${marcado ? 'checked' : ''}
+                 onchange="alternarSel(${i}, this.checked)">
+        </label>
+        ${interior}<span class="abrir">▶ Abrir en ${APP_NOMBRE}</span>
+      </div>`;
 
     const chips = [];
     if(d.subcarpeta) chips.push(`<span class="chip folder">📁 ${d.subcarpeta.replace(/</g,'&lt;')}</span>`);
@@ -461,7 +645,10 @@ function render(){
           <button class="btn save" id="save-${i}" onclick="guardar(${i})" title="Guardar nombre">💾</button>
           <button class="btn del" onclick="eliminar(${i})" title="Eliminar archivo">🗑</button>
         </div>`
-      : `<div class="nombre solo"><span title="${nombreEscapado}">${nombreEscapado}</span></div>`;
+      : `<div class="nombre solo">
+          <span title="${nombreEscapado}">${nombreEscapado}</span>
+          <button class="btn del" onclick="eliminar(${i})" title="Eliminar de Descargas">🗑</button>
+        </div>`;
 
     const botonMover = vista==='descargas'
       ? `<button class="btn mover" onclick="mover(${i})">→ Mover a mi carpeta</button>`
@@ -471,14 +658,14 @@ function render(){
       <div class="body">
         ${filaNombre}
         <div class="meta">${chips.join('')}</div>
+        <button class="btn abrir" onclick="abrir(${i})">▶ Abrir en ${APP_NOMBRE}</button>
         ${botonMover}
       </div>`;
     grid.appendChild(card);
   });
 
   document.getElementById('total').textContent = disenos.length;
-  document.getElementById('pesoTotal').textContent = pesoTot.toFixed(0)+' g';
-  document.getElementById('costoTotal').textContent = fmtCosto(costoTot);
+  actualizarBarra();
 }
 
 function marcar(i){
@@ -497,6 +684,10 @@ async function guardar(i){
     });
     const res = await r.json();
     if(res.ok){
+      // la ruta es la clave de la selección: hay que moverla al nombre nuevo
+      if(seleccion.mios.delete(disenosMios[i].archivo)){
+        seleccion.mios.add(res.nombre_final);
+      }
       disenosMios[i].archivo = res.nombre_final;
       const base = res.nombre_final.split('/').pop();
       disenosMios[i].nombre = base.replace(/\\.3mf$/i,'');
@@ -510,21 +701,39 @@ async function guardar(i){
 }
 
 async function eliminar(i){
-  const d = disenosMios[i];
-  if(!confirm(`¿Eliminar «${d.nombre}» del disco? Esta acción no se puede deshacer.`)) return;
+  const lista = activos();
+  const d = lista[i];
+  if(!d) return;
+  const donde = vista==='descargas' ? 'de Descargas' : 'del disco';
+  if(!confirm(`¿Eliminar «${d.nombre}» ${donde}? Esta acción no se puede deshacer.`)) return;
   try{
     const r = await fetch('/api/delete', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({archivo: d.archivo})
+      body: JSON.stringify({archivo: d.archivo, origen: vista})
     });
     const res = await r.json();
     if(res.ok){
-      disenosMios.splice(i, 1);
+      selActual().delete(d.archivo);
+      lista.splice(i, 1);
       render();
-      toast('✓ Eliminado del disco');
+      toast(`✓ Eliminado ${donde}`);
     } else {
       toast('✗ '+res.mensaje);
     }
+  }catch(e){ toast('✗ Error de conexión'); }
+}
+
+async function abrir(i){
+  const d = activos()[i];
+  if(!d) return;
+  toast(`Abriendo «${d.nombre}» en ${APP_NOMBRE}…`);
+  try{
+    const r = await fetch('/api/abrir', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({archivo: d.archivo, origen: vista})
+    });
+    const res = await r.json();
+    if(!res.ok) toast('✗ '+res.mensaje);
   }catch(e){ toast('✗ Error de conexión'); }
 }
 
@@ -537,6 +746,7 @@ async function mover(i){
     });
     const res = await r.json();
     if(res.ok){
+      seleccion.descargas.delete(d.archivo);
       disenosDescargas.splice(i, 1);
       render();
       toast(`✓ Movido a Mis diseños (${res.nombre_final})`);
@@ -545,6 +755,56 @@ async function mover(i){
       toast('✗ '+res.mensaje);
     }
   }catch(e){ toast('✗ Error de conexión'); }
+}
+
+async function eliminarSeleccionados(){
+  const lista = activos();
+  const sel = selActual();
+  const archivos = lista.filter(d => sel.has(d.archivo)).map(d => d.archivo);
+  if(!archivos.length) return;
+  const donde = vista==='descargas' ? 'de Descargas' : 'del disco';
+  if(!confirm(`¿Eliminar ${archivos.length} archivo(s) ${donde}? Esta acción no se puede deshacer.`)) return;
+  try{
+    const r = await fetch('/api/delete_multi', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({archivos, origen: vista})
+    });
+    const res = await r.json();
+    aplicarResultados(res.resultados, `Eliminados ${donde}`);
+  }catch(e){ toast('✗ Error de conexión'); }
+}
+
+async function moverSeleccionados(){
+  const sel = selActual();
+  const archivos = disenosDescargas.filter(d => sel.has(d.archivo)).map(d => d.archivo);
+  if(!archivos.length) return;
+  try{
+    const r = await fetch('/api/mover_multi', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({archivos})
+    });
+    const res = await r.json();
+    aplicarResultados(res.resultados, 'Movidos a Mis diseños');
+    cargarMios();
+  }catch(e){ toast('✗ Error de conexión'); }
+}
+
+/* Quita de la galería solo los que sí se procesaron y avisa de los que fallaron. */
+function aplicarResultados(resultados, etiqueta){
+  if(!resultados){ toast('✗ Respuesta inesperada del servidor'); return; }
+  const hechos = new Set(resultados.filter(r => r.ok).map(r => r.archivo));
+  const fallos = resultados.filter(r => !r.ok);
+  const lista = activos();
+  for(let i = lista.length - 1; i >= 0; i--){
+    if(hechos.has(lista[i].archivo)) lista.splice(i, 1);
+  }
+  hechos.forEach(a => selActual().delete(a));
+  render();
+  if(fallos.length){
+    toast(`✓ ${hechos.size} ${etiqueta} · ✗ ${fallos.length} con error: ${fallos[0].mensaje}`);
+  } else {
+    toast(`✓ ${hechos.size} ${etiqueta}`);
+  }
 }
 
 let toastT;
@@ -562,6 +822,7 @@ async function cargarMios(){
   const r = await fetch('/api/designs');
   const data = await r.json();
   disenosMios = data.disenos;
+  purgarSeleccion('mios', disenosMios);
   carpetaMiosTexto = data.carpeta;
   if(data.precio_sugerido){
     document.getElementById('precio').value = data.precio_sugerido;
@@ -576,6 +837,7 @@ async function cargarDescargas(){
   const r = await fetch('/api/downloads');
   const data = await r.json();
   disenosDescargas = data.disenos;
+  purgarSeleccion('descargas', disenosDescargas);
   descargasCargadas = true;
   carpetaDescargasTexto = data.carpeta;
   if(vista==='descargas'){
@@ -608,7 +870,7 @@ document.getElementById('precio').addEventListener('input', render);
 cargarMios();
 </script>
 </body>
-</html>""".replace("__MONEDA__", MONEDA)
+</html>""".replace("__MONEDA__", MONEDA).replace("__APP_NOMBRE__", nombre_app())
 
 
 # ----------------------------------------------------------
@@ -655,7 +917,8 @@ class Handler(BaseHTTPRequestHandler):
             self._json({"error": "no encontrado"}, 404)
 
     def do_POST(self):
-        if self.path not in ("/api/rename", "/api/delete", "/api/mover"):
+        if self.path not in ("/api/rename", "/api/delete", "/api/mover", "/api/abrir",
+                             "/api/delete_multi", "/api/mover_multi"):
             self._json({"ok": False, "mensaje": "ruta desconocida"}, 404)
             return
         try:
@@ -670,7 +933,23 @@ class Handler(BaseHTTPRequestHandler):
                                        data.get("viejo", ""), data.get("nuevo", ""))
             self._json({"ok": ok, "mensaje": msg, "nombre_final": final})
         elif self.path == "/api/delete":
-            ok, msg = eliminar(self.carpeta, data.get("archivo", ""))
+            base = (self.carpeta_descargas
+                    if data.get("origen") == "descargas" else self.carpeta)
+            ok, msg = eliminar(base, data.get("archivo", ""))
+            self._json({"ok": ok, "mensaje": msg})
+        elif self.path == "/api/delete_multi":
+            base = (self.carpeta_descargas
+                    if data.get("origen") == "descargas" else self.carpeta)
+            self._json({"ok": True,
+                        "resultados": eliminar_varios(base, _lista_archivos(data))})
+        elif self.path == "/api/mover_multi":
+            self._json({"ok": True,
+                        "resultados": mover_varios(self.carpeta_descargas, self.carpeta,
+                                                   _lista_archivos(data))})
+        elif self.path == "/api/abrir":
+            base = (self.carpeta_descargas
+                    if data.get("origen") == "descargas" else self.carpeta)
+            ok, msg = abrir_en_bambu(base, data.get("archivo", ""))
             self._json({"ok": ok, "mensaje": msg})
         else:  # /api/mover
             ok, msg, final = mover_desde_descargas(self.carpeta_descargas, self.carpeta,
