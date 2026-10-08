@@ -1,0 +1,55 @@
+{
+  "_comentario": "Tus números. Cámbialos aquí, no en el código.",
+  "precio_kg": 175,
+  "paqueteria": 14.04,
+  "revisiones_semanas": [
+    2,
+    4,
+    6
+  ],
+  "umbral_escalar": 1.0,
+  "umbral_potenciar": 0.3,
+  "ventas_minimas_para_confiar": 8,
+  "dias_datos_viejos": 7,
+  "categorias": {
+    "portacontroles": [
+      "control remoto",
+      "controles"
+    ],
+    "portacubiertos": [
+      "cubiertos"
+    ],
+    "portalapices": [
+      "portalapices",
+      "portalápices",
+      "lapicero"
+    ],
+    "figuras": [
+      "origami",
+      "japandi",
+      "jirafa",
+      "elefante",
+      "perro",
+      "gato"
+    ],
+    "portacepillos": [
+      "portacepillos",
+      "cepillos"
+    ],
+    "floreros": [
+      "florero"
+    ],
+    "macetas": [
+      "maceta"
+    ]
+  },
+  "_ayuda": {
+    "revisiones_semanas": "semanas después de publicar en que toca revisar",
+    "umbral_escalar": "fracción de la mediana de su categoría (u/semana) para recomendar escalar",
+    "umbral_potenciar": "debajo de esto se recomienda iterar o retirar",
+    "ventas_minimas_para_confiar": "con menos ventas el reporte avisa que es ruido",
+    "categorias": "palabras del título de ML que asignan cada publicación a una categoría (la primera que coincida)",
+    "precio_kg": "filamento MXN/kg — igual que .catalogo3d_costos.json (estudio de mercado §3)",
+    "paqueteria": "costo fijo por venta: caja, semillas, etiquetas, maceta regalo"
+  }
+}
