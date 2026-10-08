@@ -1,0 +1,28 @@
+{
+  "_comentario": "Tus números. Cámbialos aquí, no en el código.",
+
+  "impresoras": 1,
+  "horas_por_dia": 14,
+  "gramos_por_hora": 20,
+
+  "dias_lead_full": 5,
+  "colchon_dias": 2,
+  "cobertura_objetivo_dias": 30,
+  "minimo_por_sku": 3,
+
+  "incluir_no_full": true,
+  "carpeta_disenos": "~/Desktop/own design 3d",
+
+  "horas_por_pieza": {},
+
+  "_ayuda": {
+    "impresoras": "cuántas corriendo en paralelo",
+    "horas_por_dia": "horas reales de impresión al día, ya descontando cambios de placa",
+    "gramos_por_hora": "ritmo de extrusión promedio; se usa para estimar horas cuando no hay dato por pieza",
+    "dias_lead_full": "días entre que entregas la colecta y que ML activa el stock",
+    "colchon_dias": "margen para no llegar al filo",
+    "cobertura_objetivo_dias": "cuántos días de venta quieres que cubra el envío",
+    "minimo_por_sku": "piso de unidades para diseños sin historial",
+    "horas_por_pieza": "override manual: {\"nombre del .3mf\": 3.5}"
+  }
+}

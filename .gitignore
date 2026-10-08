@@ -1,4 +1,20 @@
 __pycache__/
 *.pyc
 .DS_Store
-.claude/
+
+# .claude: se versiona el conocimiento (skills, specs, registros de piezas,
+# investigación de mercado pública). Lo local del usuario se queda fuera.
+.claude/*
+!.claude/skills/
+!.claude/specs/
+!.claude/optimizaciones/
+!.claude/productos/
+.claude/productos/*
+!.claude/productos/investigacion/
+
+# Nunca al repo (es público): credenciales, tokens y datos de ventas.
+.env
+*.env
+*credencial*
+*token*.json
+ml_datos.json
