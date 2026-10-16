@@ -114,3 +114,63 @@ opciones, decisión informada.
   (asumiendo que los techos curvos de los compartimentos son autoportantes, como
   parece ser por diseño) o activarlo — no se tocó por ser cambio de mayor impacto
   en una pieza ya vendida con este perfil.
+
+## 2026-10-16 (v4) — "¿puedes ayudarme a mejorar el tiempo de este producto?"
+
+Base medida por CLI (Bambu Studio 02.07, `--slice 1`) de la v3 tal como estaba:
+**28 h 50 m y 663.1 g la placa de 4** (7.2 h y 166 g por pieza, igual que la
+tarjeta). La `slice_info` guardada era vieja (3 copias, 13.8 h, 465 g).
+
+Diagnóstico (`feature_type_times`):
+- Paredes 17.9 h: cada pieza tiene ~1.29 m de pared por capa (divisores + ambas
+  caras) × 980 capas de 0.12. La pared mide ~2.2 mm (área/medio perímetro de la
+  sección): 3 vueltas de 0.45 no caben y 2 sobran → **relleno de hueco 3 h** y
+  ~110 retracciones con salto en Z por capa (**viajes 5.6 h**).
+- El filamento del proyecto es «Generic PLA @BBL P2S» con tope de **12 mm³/s**:
+  a 0.12 casi no frena, pero a capa 0.2 sí (por eso capa 0.2 sola daba solo −25 %).
+- Geometría: paredes rectas verticales de 0 a ~38 mm; de 38 a 118 mm los extremos
+  se curvan (arcos).
+
+Probado (placa de 4, CLI):
+
+| Variante | Tiempo | Peso |
+|---|---|---|
+| v3 actual | 28 h 50 | 663.1 g |
+| Arachne (3 vueltas) | 35 h 04 | 671 g — peor |
+| `infill_combination`=1 / `filter_out_gap_fill`=2 | 28 h 50 / 28 h 55 | sin efecto |
+| `retraction_minimum_travel` 1→3 | −30 a −35 min | — (no aplicado) |
+| flujo 21 solo | 28 h 06 | — |
+| capa 0.2 toda | 21 h 30 | 647 g |
+| capa 0.2 + flujo 21 | 18 h 36 | 647 g |
+| **2 vueltas, hilo interior 0.62 / exterior 0.45**, capa 0.12, flujo 21 | 20 h 04 | 661 g |
+| ídem, rectas 0.2 / arcos 0.12 | 18 h 06 | 662 g |
+| **ídem, rectas 0.2 / arcos 0.16 (elegida)** | **16 h 13** | **658.5 g** |
+| ídem, todo 0.2 | 14 h 32 | 645 g |
+| ídem todo 0.2, Arachne 2 vueltas | 13 h 27 | 535 g — la pared queda hueca con relleno 4 %, descartada |
+| sin flujo 21 (12): todo 0.2 / arcos 0.16 / arcos 0.12 | 17 h 51 / 18 h 52 / 20 h 23 | — |
+
+Cambios aplicados (usuario eligió «arcos 0.16» y dijo que imprime con Bambu PLA
+Basic/Matte):
+- `wall_loops` 3→2, `inner_wall_line_width` 0.45→0.62, `outer_wall_line_width`
+  0.42→0.45 (misma pared maciza en mm, menos trazos; peso igual lo confirma).
+- `Metadata/layer_config_ranges.xml` en los 4 objetos: 3–38 mm a 0.20, 38–118 mm
+  a 0.16 (0–3 mm queda a 0.12 del perfil, el fondo).
+- `filament_max_volumetric_speed` 12→21 (en la lista de filamento de
+  `different_settings_to_system`).
+- `slice_info.config` + `plate_1.gcode` regenerados con el CLI para que el archivo
+  traiga el tiempo/peso nuevos. Malla y `3dmodel.model` sin tocar.
+
+| | v3 | v4 | cambio |
+|---|---|---|---|
+| Placa de 4 | 28 h 50 m | 16 h 13 m | −44 % |
+| Por pieza | 7 h 13 m | 4 h 03 m | −3 h 10 m |
+| Peso por pieza | 165.8 g | 164.6 g | −1.2 g |
+| Costo por pieza | $44.06 | $43.87 | −$0.19 |
+
+Costo = g × 167 $/kg + $16.38 paquetería. Respaldo de la v3:
+`portacontroles4espacios.3mf.v3.bak`.
+
+Pendiente: imprimir la primera placa y revisar (a) la transición 0.2→0.16 a 38 mm
+(no debe verse escalón), (b) que las paredes no subextruyan a 21 mm³/s, (c) que la
+curva no salga peluda. `ironing_type` sigue en "top surface" (= sin planchado, así
+se ha impreso siempre); no se tocó para no sumar tiempo.
