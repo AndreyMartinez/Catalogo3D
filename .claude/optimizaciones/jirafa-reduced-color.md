@@ -154,6 +154,100 @@ Un solo objeto, escala anisotrópica (sin rotación).
   - Verificado tras escribir: `testzip()` sin errores, malla watertight, las 4
     bbox mundo dentro de 0-256 en X/Y.
 
+## Versiones
+
+| Versión | Fecha | Qué es | Respaldo |
+|---|---|---|---|
+| v1 | 09-19 | Original de MakerLab, 87.8×210.2×252.3 mm | `reduced_color.3mf.bak` |
+| v2 | 09-21 | Malla decimada 60k + patas +0.3 mm, ×0.65 → 57×137×165 mm | `reduced_color.3mf.v2.bak` |
+| v3 | 09-28 | Uniforme ×1.20 → 68.5×164.6×197.4 mm, 4 por plato | `reduced_color.3mf.v3.bak` |
+| v4 | 10-17 | Cuello/cara/patas engrosados, 61×125×150 mm, 4 por plato | `reduced_color.3mf.v4.bak` |
+| v5 | 10-17 | v4 + soporte que se desprende limpio y bloqueadores pintados | (actual) |
+
+## 2026-10-17 (v4) — "cuando lo imprimí se ve aún muy delgado, el cuello y la cara"
+
+- Feedback: impresa se ve delgada, sobre todo cuello y cara; que el tamaño se vea
+  atractivo en la caja de 20×16×11 cm (la misma de los gorilas). La tarjeta trae
+  77 g capturados a mano (`.catalogo3d_mercadolibre.json`), no se sabe a qué alto
+  la imprimió.
+- Mercado: figuras = 44 u / 90 d, 9 % (*medido*, estudio al 10-07).
+- Diagnóstico (v3, 197 mm): cuello 26×30 mm a media altura, patas ~11 mm, cara
+  ~16 mm de ancho en el hocico. A 197 mm **no cabía en la caja** (164.6 mm de
+  largo contra 160). CLI v3: 487.2 g / 28.8 h el plato de 4 (~122 g y 7.2 h c/u).
+- Cambio de malla (deformación por regiones, no geometría nueva, ver
+  [[estilo-origami-facetado]]): escalas afines por altura para que las facetas
+  sigan planas, con transiciones smoothstep.
+  - Cuello (z 0→60 del marco centrado a 197 mm): ×1.40 en X y ×1.35 en Y
+    alrededor de un eje recto ajustado al cuello diagonal; solo vértices a <16–24 mm
+    del eje (si no, el hocico se estiraba).
+  - Cara/cabeza (z>52–64): ×1.35 en X dentro de |x|<17 mm; orejas y cuernos
+    fuera de eso solo se recorren hacia afuera, conservan su tamaño.
+  - Patas (z<−48→−36): ×1.30 en X/Y alrededor del centro de cada pata por altura
+    (centros tomados de secciones por debajo de z=−50), solo a <11–17 mm del
+    centro; peso cero en la cola y en las costuras x≈0 / y≈0. Las versiones
+    sin esas máscaras dieron 210 → 74 → 40 → 8 caras invertidas; la final, 0.
+  - Resultado a 197 mm: cuello 26×30 → 36×40, sección baja 35×48 → 49×50,
+    patas 11 → 14–15 mm; vol. sólido 235.5 → 287.4 cm³; watertight y winding OK.
+- Tamaño para la caja (decidido con el usuario entre 3, laminados con el CLI,
+  1 pieza cada uno):
+
+  | Opción | Medidas | Peso | Tiempo | Costo (167 $/kg + $16.38) | En caja |
+  |---|---|---|---|---|---|
+  | A | 100 mm de alto | 28.2 g | 2.3 h | $21.09 | de pie, se ve chica; 12/plato |
+  | **B (elegida)** | 61×125×150 mm | 76.9 g | 5.1 h | $29.22 | acostada, ~2.5 cm de holgura; 4/plato |
+  | C | 73×150×180 mm | 122.0 g | 7.3 h | $36.75 | acostada, ~1 cm de holgura; 4/plato |
+
+- La malla quedó horneada a medida final (transform de escala 1, base en z=0,
+  sin la escala anisotrópica de antes). Plato P2S: 3 en fila + 1 girada 90°
+  (convex hull, 6 mm entre huellas, 5 mm a bordes; `model_settings.config`
+  sincronizado, 4 items / 4 instancias / 4 assemble).
+- Perfil: `ironing_type` "top surface" → **"top"** (Bambu no reconocía el valor
+  viejo y no planchaba); lo demás igual (0.12 mm, 2 paredes, grid 15 %, árbol
+  auto a 50°, `support_on_build_plate_only`=0).
+
+| | v3 (197 mm, delgada) | v4 (150 mm, engrosada) |
+|---|---|---|
+| Plato de 4 (CLI) | 487.2 g · 28.8 h | **307.2 g · 20.3 h** |
+| Por pieza | ~121.8 g · 7.2 h · $36.72 | **76.8 g · 5.1 h · $29.21** |
+| ¿Cabe en 20×16×11? | no | sí, acostada |
+
+- Pendiente: la miniatura `plate_1.png` sigue siendo la vieja (se regenera al
+  rebanar y guardar en Bambu Studio); imprimir una y confirmar que el cuello y
+  la cara ya se ven robustos.
+
+## 2026-10-17 (v5) — "que cuando desprenda los apoyos no quede algo sobrante feo"
+
+- Volados medidos en la v4 (150 mm, caras a <45° de la horizontal): 2596 mm²
+  — cabeza 799, cuello 63, cuerpo 1343 (casi todo panza), patas 284, cola 108.
+- **Bloqueadores pintados** (`paint_supports="8"` por triángulo en
+  `3D/Objects/object_1.model`; 8 = bloqueador, 4 = forzar): 1830 caras /
+  407 mm² en cabeza (240), cuello (50) y patas (117). Criterio: volado de 30–45°
+  de la horizontal (con capa 0.12 se imprime solo), sin tocar caras a <30°
+  (quijada, bajo las orejas, panza) ni las que están a 3 anillos de un mínimo
+  local (puntas que arrancan en el aire: 11 vértices).
+- Ajustes de soporte (agregados a `different_settings_to_system`):
+
+  | Clave | v4 | v5 |
+  |---|---|---|
+  | `support_interface_top_layers` | 2 | 3 |
+  | `support_interface_spacing` | 0.5 | 0.2 |
+  | `support_interface_pattern` | auto | rectilinear_interlaced |
+  | `support_object_xy_distance` | 0.35 | 0.5 |
+  | `support_top_z_distance` | 0.2 | 0.24 |
+  | `support_threshold_angle` | 50 | 45 |
+
+- CLI, plato de 4:
+
+  | | v4 | v5 |
+  |---|---|---|
+  | Plato | 307.2 g · 20.28 h (soporte 6.43 h) | **272.0 g · 17.48 h (soporte 4.29 h)** |
+  | Por pieza | 76.8 g · 5.07 h · $29.21 | **68.0 g · 4.37 h · $27.74** |
+
+- No separé cuánto del ahorro es del ángulo y cuánto de los bloqueadores.
+- Pendiente: imprimir y revisar con foto si las facetas bloqueadas de la cara o
+  los hombros se caen; si alguna sale colgada, quitarle el bloqueador a esa zona
+  (o regresar el ángulo a 50°) en vez de volver a la v4.
+
 ## Pendiente / conocido y no resuelto
 - **Bug propio detectado y corregido en el momento (09-21)**: al escribir las
   coordenadas de la malla nueva usé `%r` directo sobre valores numpy sin convertir
