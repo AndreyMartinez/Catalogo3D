@@ -163,7 +163,8 @@ Un solo objeto, escala anisotrópica (sin rotación).
 | v3 | 09-28 | Uniforme ×1.20 → 68.5×164.6×197.4 mm, 4 por plato | `reduced_color.3mf.v3.bak` |
 | v4 | 10-17 | Cuello/cara/patas engrosados, 61×125×150 mm, 4 por plato | `reduced_color.3mf.v4.bak` |
 | v5 | 10-17 | v4 + soporte que se desprende limpio y bloqueadores pintados | `reduced_color.3mf.v5.bak` |
-| v6 | 10-18 | Patas ×1.75, pezuña plana (corte 1 mm) y brim de 6 mm | (actual) |
+| v6 | 10-18 | Patas ×1.75, pezuña plana (corte 1 mm) y brim de 6 mm | `reduced_color.3mf.v6.bak` |
+| v7 | 10-18 | v6 + soporte `tree_hybrid` (bloque sólido bajo la panza) | (actual) |
 
 ## 2026-10-17 (v4) — "cuando lo imprimí se ve aún muy delgado, el cuello y la cara"
 
@@ -282,6 +283,40 @@ Un solo objeto, escala anisotrópica (sin rotación).
   se mueve, siguen bajar la velocidad y la aceleración de la pared exterior
   (hoy 200 mm/s y 6000 mm/s²) o agregar `slow_down_layer_time` en las capas
   delgadas de las patas.
+
+## 2026-10-18 (v7) — "se dañó el centro de nuevo, la panza no funcionó"
+
+- La v6 falló otra vez a media impresión: la cámara de la P2S mostraba
+  filamento enredado sobre la placa y la tarea cancelada.
+- Diagnóstico con el gcode de la v6 (dibujé los trazos de soporte por capa):
+  la panza es una superficie casi plana de ~1300 mm² a **48 mm de altura**,
+  entre las patas. Arriba sí quedaba cubierta (95 % en la capa de 47.8 mm), pero
+  la sostenían **unos pocos troncos de árbol de ~5 mm** que suben desde la placa
+  (ramas de 2 mm, a 150 mm/s, ×4 jirafas). Esa estructura es la que cede.
+- Cambios:
+  - `support_style` default → **`tree_hybrid`**: árbol en puntas y orejas, y
+    soporte normal (bloque en rejilla) bajo superficies grandes y planas. Es el
+    estilo que usan los perfiles de Bambu.
+  - `tree_support_branch_diameter` 2 → **4**; `support_speed` 150 → **100**;
+    `support_top_z_distance` 0.24 → **0.2** (la panza grande cuelga menos;
+    la interfaz densa de 3 capas sigue facilitando el desprendimiento).
+  - Pintura: se quitan los bloqueadores en la franja de 28–56 mm (muslos y
+    panza; quedan 1889 caras / 479 mm² en cara, cuello y patas) y se **fuerza
+    soporte** (`paint_supports="4"`) en las caras de abajo de la panza
+    (3582 caras / 1791 mm², z 43–53, |x|<26, normal hacia abajo).
+- Verificación en gcode: bajo la panza hay un bloque sólido de rejilla desde la
+  placa (~780 mm² a 10 mm de altura, ~640 mm² a 40 mm, contra 145–475 mm² en
+  troncos sueltos en la v6) y la cobertura arriba sube a 99.5 %. Bajo la cabeza
+  sale un tronco de ~15 mm.
+
+  | Por pieza (CLI, plato de 4) | v6 | v7 |
+  |---|---|---|
+  | Peso | 74.3 g | **93.0 g** (+18.7 g, casi todo soporte) |
+  | Tiempo | 4.58 h | **4.96 h** |
+  | Costo | $28.79 | **$31.91** |
+
+- Si funciona y se quiere recortar soporte: subir `support_base_pattern_spacing`
+  de 2.5 a 3.5 (no probado).
 
 ## Pendiente / conocido y no resuelto
 - **Bug propio detectado y corregido en el momento (09-21)**: al escribir las
