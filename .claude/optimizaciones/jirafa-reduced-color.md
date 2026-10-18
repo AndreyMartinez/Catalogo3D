@@ -162,7 +162,8 @@ Un solo objeto, escala anisotrópica (sin rotación).
 | v2 | 09-21 | Malla decimada 60k + patas +0.3 mm, ×0.65 → 57×137×165 mm | `reduced_color.3mf.v2.bak` |
 | v3 | 09-28 | Uniforme ×1.20 → 68.5×164.6×197.4 mm, 4 por plato | `reduced_color.3mf.v3.bak` |
 | v4 | 10-17 | Cuello/cara/patas engrosados, 61×125×150 mm, 4 por plato | `reduced_color.3mf.v4.bak` |
-| v5 | 10-17 | v4 + soporte que se desprende limpio y bloqueadores pintados | (actual) |
+| v5 | 10-17 | v4 + soporte que se desprende limpio y bloqueadores pintados | `reduced_color.3mf.v5.bak` |
+| v6 | 10-18 | Patas ×1.75, pezuña plana (corte 1 mm) y brim de 6 mm | (actual) |
 
 ## 2026-10-17 (v4) — "cuando lo imprimí se ve aún muy delgado, el cuello y la cara"
 
@@ -247,6 +248,40 @@ Un solo objeto, escala anisotrópica (sin rotación).
 - Pendiente: imprimir y revisar con foto si las facetas bloqueadas de la cara o
   los hombros se caen; si alguna sale colgada, quitarle el bloqueador a esa zona
   (o regresar el ángulo a 50°) en vez de volver a la v4.
+
+## 2026-10-18 (v6) — "se dañaron feo en la generación de base, las patas son muy delgadas"
+
+- Impresa la v5: las jirafas se dañaron en la base (no hubo foto; se interpretó
+  como falla de adherencia y estabilidad en las patas).
+- Causa medida en la v5 (150 mm): la pezuña termina redondeada y **toca la
+  placa con solo 31–40 mm² cada una (~6 mm de ancho)**; 1 mm más arriba ya mide
+  ~12 mm. La pata medía ~10 mm de grosor a media altura. Son 4 puntos chicos
+  sosteniendo 150 mm de figura más el soporte de árbol, y el brim era `auto_brim`
+  (30 s en todo el plato, casi nada).
+- Cambios:
+  - **Patas ×1.30 → ×1.75**, con la transición radial ampliada de 11–17 a
+    14–22 mm (en el marco de 197 mm). Probé ×1.6 y ×1.9; ×1.9 dejaba 29 caras
+    invertidas y bultos en los muslos, ×1.75 da 0. Los bultos de las rodillas son
+    del modelo original.
+  - **Corte plano de 1 mm en la base** (`slice_plane` con tapa): el redondeo
+    de la pezuña se va y queda una suela plana. Alto 150 → 149 mm.
+  - **Brim** `auto_brim` → `outer_only`, 6 mm (queda bajo la pezuña, no se ve).
+  - Soporte igual que la v5; bloqueadores recalculados con las mismas reglas
+    sobre la malla nueva: 2070 caras / 671 mm² (los muslos más gruesos agregan
+    facetas de 30–45° en las rodillas).
+- Medidas (150 mm):
+
+  | | v5 | v6 |
+  |---|---|---|
+  | Contacto de cada pezuña con la placa | 31–40 mm² | **183–209 mm²** |
+  | Grosor de pata a 12 mm de alto | ~10 mm | **13.1–13.8 mm** |
+  | Plato de 4 (CLI) | 272.0 g · 17.48 h | **297.2 g · 18.33 h** (brim 4.8 min) |
+  | Por pieza | 68.0 g · 4.37 h · $27.74 | **74.3 g · 4.58 h · $28.79** |
+
+- Pendiente: imprimir y confirmar con foto que la base ya aguanta. Si todavía
+  se mueve, siguen bajar la velocidad y la aceleración de la pared exterior
+  (hoy 200 mm/s y 6000 mm/s²) o agregar `slow_down_layer_time` en las capas
+  delgadas de las patas.
 
 ## Pendiente / conocido y no resuelto
 - **Bug propio detectado y corregido en el momento (09-21)**: al escribir las
