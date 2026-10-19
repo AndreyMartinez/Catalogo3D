@@ -32,7 +32,9 @@ Antes de transformar, revisa en `.claude/mercado/estudio-de-mercado.md` cuánto 
    créalo. Si ya existe (de una sesión anterior) y vas a modificar un archivo que
    ya fue editado antes, crea además `<archivo>.3mf.vN.bak` (N = siguiente
    número libre) para poder volver al estado justo anterior a este pase, no solo
-   al original de fábrica.
+   al original de fábrica. Cada pase es una versión: sigue **Versionamiento** de
+   `optimizar-pieza` (paso 6) — respaldo `.vN.bak` del .3mf y su .png, tabla de
+   tiempo, peso y costo contra la versión anterior, sección `(vN)` en el registro.
 
 ## 1. Diagnóstico (una sola vez, con datos — no a ojo)
 
@@ -59,9 +61,18 @@ networkx lxml shapely`), sobre la malla y el transform actuales:
 - `layer_height` → 0.12mm (si está en algo más grueso como 0.2).
 - `top_shell_layers` / `bottom_shell_layers`: súbelos en la misma proporción en
   que baja `layer_height` (mismo grosor sólido en mm, más resolución).
-- `ironing_type` → `"top surface"`. **Ojo**: esto alisa solo las superficies
+- `ironing_type` → `"top"` (los valores válidos son `no ironing`, `top`,
+  `topmost`, `solid`; **`"top surface"` no existe** y Bambu lo cambia en silencio
+  a `no ironing` — así pasó en Wolken, pORTAcONTROLES03 y borderedondo01, ver
+  `triple-remote-holder.md`). Confírmalo en el G-code laminado: `; ironing_type =
+  top` y bloques `; FEATURE: Ironing`. **Ojo**: esto alisa solo las superficies
   HORIZONTALES de arriba, no los costados curvos — no prometas "lijado" en toda
   la pieza, el resto del acabado depende del layer height y de la malla.
+  En recipientes `top` también plancha el **fondo de cada compartimento** (no se
+  ve y cuesta horas); si la boca es inclinada `topmost` no plancha nada. Para
+  planchar solo la boca: `ironing_type` global `no ironing` y un rango en
+  `Metadata/layer_config_ranges.xml` con `layer_height` 0.12 + `ironing_type`
+  `top` desde la altura donde empieza la boca.
 - `detect_thin_wall` → `"1"` **solo si** el diagnóstico de grosor de pared del
   paso 1 no muestra zonas al límite de 2 perímetros (si las hay, arréglalas
   primero con el método 4a de optimizar-pieza, o deja `detect_thin_wall` en 0 y

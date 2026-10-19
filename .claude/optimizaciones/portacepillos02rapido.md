@@ -106,3 +106,58 @@ casi no se vea, vasos un poco menos anchos y más altos, pared un poco más grue
   Probado: 1.45/0.42 → 6.0 h 149 g; 1.6/0.5 → 5.9 h 170 g; 1.75/0.58 → 6.0 h 190 g.
   Engrosar así no cuesta tiempo, solo gramos. Capa 280 dibujada: hilos soldados.
 - Resultado: **5.9 h, 170 g** por plato de 2 juegos (~85 g/juego, ≈ $27.9 de costo).
+
+## 2026-10-07 (quinta versión) — "el plato está súper delgado, los vasos muy livianos"
+Feedback: la base de la v4 (placa con silueta, sin borde, piso 1.2) se veía delgada
+y sin bordes; quiere el borde de la **v1** ("la primera lo hiciste perfecto"), plato
+más grueso y vasos más gruesos porque se sienten excesivamente livianos.
+- Se le mostraron dos renders: A = cápsula de la v1 con borde; B = mismo borde con
+  cintura siguiendo los dos círculos. **Eligió A.**
+- Bandeja (`bandeja()` reescrita): cápsula con borde de 1.6 mm hasta 7 mm de alto,
+  borde a 3.5 mm de los aros (v1 tenía ~4.5; a 4.5 la 4ª taza ya no cabe en el plato
+  de 2 juegos por 1.2 mm), aros de asiento iguales, **piso 1.2 → 2.4 mm**.
+  153×81×7 mm.
+- Piso de 2.4 con relleno 0 % saldría hueco y puenteado (3 capas abajo + 5 arriba =
+  1.6 mm): `bottom_shell_layers` 3→**7** embebido (7+5 = 12 capas = 2.4 mm macizo).
+  Verificado en el G-code: de 0 a 2.4 mm solo sólido interno, sin puente ni relleno.
+  En el vaso no cambia nada (su piso de 1.2 ya era macizo).
+- Vasos: pared 1.6/hilo 0.5 → **1.75/hilo 0.58** (la opción ya medida en la v4).
+- CLI, plato de 2 juegos: **6.8 h, 233 g** (≈116 g por juego) vs 5.9 h, 170 g.
+  Costo ≈ $20.4 material + $14.04 paquetería = **$34.4/juego** (antes ≈ $28.9).
+- Respaldo de la v4: `Portacepillos02RAPIDO.3mf.v4.bak` (+ `.png.v4.bak`).
+- Pendiente: imprimir y confirmar que el peso en mano ya convence; si los vasos
+  siguen livianos, la siguiente palanca es el piso del vaso (1.2 → 2.4 con las
+  mismas 7 capas de fondo), no más pared (el hilo ya redondearía la estría).
+
+## 2026-10-08 (sexta versión) — "otro nivel", ahora más angosto, más pesadito y aro en luna
+Feedback: le encantó la v5. Pidió reducir lo ancho con más pared para que se sienta
+más pesadito, y cortar el aro de asiento "como luna" para que la otra parte del vaso
+pegue contra el borde.
+- **Hallazgo: el borde del plato salía hueco.** Con `wall_loops`=1 (lo que necesitan
+  los vasos) el borde de 1.6 de la v5 eran dos hilos de 0.58 con 0.44 mm de aire, y
+  uno de 3.0 igual: ~81 mm³ por capa contra ~220 de área real. Arreglo: ajuste **por
+  objeto** en `Metadata/model_settings.config` (`POR_OBJETO`: la bandeja con
+  `wall_loops` 3) → 218 mm³/capa, macizo. El CLI sí lo respeta. Ids de
+  model_settings = ids del build (verificado).
+- Bandeja: el borde abraza la mitad de afuera de cada vaso (sin hueco aro–borde) y el
+  aro queda como **media luna** del lado que mira al otro vaso (1.2 mm en el centro,
+  afinándose a cero contra el borde). Borde 1.6 → **3.0 mm macizo**, piso 2.4.
+  153×81 → **139×70×7 mm**.
+- Variantes medidas (CLI, plato de 2 juegos; costo = g × 0.175 + 14.04):
+
+| Variante | Tiempo | Plato | $/juego |
+|---|---|---|---|
+| v5 (Ø66, pared 1.75, base hueca) | 6.78 h | 233 g | 34.4 |
+| A: base luna, vaso v5 | 6.76 h | 231 g | 34.2 |
+| B: A + piso vaso 2.4 | 6.88 h | 248 g | 35.8 |
+| C: B con vaso Ø62 | 6.44 h | 228 g | 34.0 |
+| **D: C con pared 1.9 / hilo 0.65 (entregada)** | **6.46 h** | **245 g** | **35.5** |
+
+- Entregada D: vaso **Ø62** (63.2 con estría) × 105, pared **1.9** con
+  `outer_wall_line_width` **0.65**, piso del vaso **2.4**. Por pieza (G-code): vaso
+  44 → **48.5 g** (+10 %), bandeja 37 → **32 g**. Hilo 0.65 verificado en la capa
+  z=50: 2 trazos por vaso (sin fragmentar), ejes a 0.62 mm en el fondo del surco
+  (soldados), estría de 1.24 mm cresta-valle en la trayectoria (v5: 1.23).
+- Respaldo de la v5: `Portacepillos02RAPIDO.3mf.v5.bak` (+ `.png.v5.bak`).
+- Pendiente: imprimir y confirmar el peso en mano y que el vaso Ø62 asiente bien en
+  la luna + borde (holgura 0.6 mm).

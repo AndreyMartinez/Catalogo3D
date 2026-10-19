@@ -5,7 +5,7 @@ publicaciones, stock en Full y ventas de los últimos N días.
 Deja todo crudo en ~/.catalogo3d/ml_datos.json para que plan.py calcule
 sin volver a pegarle a la API.
 
-Uso:  python3 scripts/traer_datos.py [--dias 90]
+Uso:  python3 scripts/traer_datos.py [--dias 125]
 """
 import argparse
 import json
@@ -21,6 +21,9 @@ SALIDA = ml_api.CARPETA / "ml_datos.json"
 # Se piden las órdenes por ventanas: los rangos largos a veces los corta
 # la API sin avisar, y así además se nota si una ventana viene vacía.
 DIAS_POR_VENTANA = 30
+# La CDMX no cambia de hora desde 2022: huso fijo, sin depender de la base
+# de husos horarios del sistema.
+HUSO_MX = timezone(timedelta(hours=-6))
 
 
 def iso(dt):
@@ -80,7 +83,7 @@ def stock_full(inventory_id, seller_id):
         return {"error": str(e)}
 
 
-def traer_ordenes(seller_id, desde, hasta):
+def traer_ordenes(seller_id, desde, hasta, estado="paid"):
     ordenes, ventana = [], desde
     while ventana < hasta:
         fin = min(ventana + timedelta(days=DIAS_POR_VENTANA), hasta)
@@ -88,7 +91,7 @@ def traer_ordenes(seller_id, desde, hasta):
         while True:
             r = ml_api.pedir("/orders/search", {
                 "seller": seller_id,
-                "order.status": "paid",
+                "order.status": estado,
                 "order.date_created.from": iso(ventana),
                 "order.date_created.to": iso(fin),
                 "sort": "date_desc",
@@ -106,12 +109,36 @@ def traer_ordenes(seller_id, desde, hasta):
     return ordenes
 
 
+def dia_mx(date_created):
+    """AAAA-MM-DD en la Ciudad de México. ML manda la hora en su huso
+    (normalmente −04:00): una venta de las 23:00 en la CDMX ya es el día
+    siguiente allá. Si no se puede leer, se queda la fecha tal cual."""
+    texto = date_created or ""
+    try:
+        dt = datetime.fromisoformat(texto.replace("Z", "+00:00"))
+    except ValueError:
+        return texto[:10]
+    if dt.tzinfo is None:
+        return dt.date().isoformat()
+    return dt.astimezone(HUSO_MX).date().isoformat()
+
+
+def _dia_vacio():
+    return {"ordenes": 0, "unidades": 0, "ingreso": 0.0, "canceladas": 0}
+
+
 def resumir_ordenes(ordenes):
     """Unidades vendidas por publicación y por día, separando Full del
-    resto: lo que sale de tu casa no se repone con una colecta."""
-    por_item = {}
+    resto: lo que sale de tu casa no se repone con una colecta.
+
+    Devuelve (por_item, por_dia). por_dia son los totales de la cuenta:
+    una orden puede traer varias publicaciones, así que las órdenes no se
+    pueden reconstruir sumando publicaciones. El ingreso es bruto por
+    precio de venta (unit_price × cantidad), sin envío ni cargos de ML."""
+    por_item, por_dia = {}, {}
     for o in ordenes:
-        fecha = (o.get("date_created") or "")[:10]
+        fecha = dia_mx(o.get("date_created"))
+        contada = False
         # 'fulfilled' no distingue el canal; el tipo de logística vive en
         # el envío, así que se marca la orden y plan.py decide.
         for li in o.get("order_items") or []:
@@ -124,21 +151,42 @@ def resumir_ordenes(ordenes):
                 "seller_sku": item.get("seller_sku"),
                 "variantes": {},
                 "por_dia": {},
+                "ingreso_por_dia": {},
                 "unidades": 0,
             })
             cant = int(li.get("quantity") or 0)
+            pesos = cant * float(li.get("unit_price") or 0)
             reg["unidades"] += cant
             reg["por_dia"][fecha] = reg["por_dia"].get(fecha, 0) + cant
+            reg["ingreso_por_dia"][fecha] = round(
+                reg["ingreso_por_dia"].get(fecha, 0.0) + pesos, 2)
             vid = str(item.get("variation_id") or "")
             if vid:
                 reg["variantes"][vid] = reg["variantes"].get(vid, 0) + cant
-    return por_item
+            dia = por_dia.setdefault(fecha, _dia_vacio())
+            dia["unidades"] += cant
+            dia["ingreso"] = round(dia["ingreso"] + pesos, 2)
+            contada = True
+        if contada:
+            por_dia[fecha]["ordenes"] += 1
+    return por_item, por_dia
+
+
+def contar_canceladas(ordenes, por_dia):
+    """Suma las órdenes canceladas a los totales por día. No tocan las
+    ventas por publicación: plan.py y semana.py no las ven."""
+    for o in ordenes:
+        fecha = dia_mx(o.get("date_created"))
+        por_dia.setdefault(fecha, _dia_vacio())["canceladas"] += 1
+    return por_dia
 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--dias", type=int, default=90,
-                    help="ventana de historial de ventas (por defecto 90)")
+    # 125 días: el mes en curso más tres meses completos para comparar al
+    # mismo día (mes.py de estudio-mercado).
+    ap.add_argument("--dias", type=int, default=125,
+                    help="ventana de historial de ventas (por defecto 125)")
     args = ap.parse_args()
 
     try:
@@ -184,14 +232,21 @@ def main():
     desde = hasta - timedelta(days=args.dias)
     print(f"Ventas de los últimos {args.dias} días...", end=" ", flush=True)
     ordenes = traer_ordenes(seller_id, desde, hasta)
-    ventas = resumir_ordenes(ordenes)
+    ventas, por_dia = resumir_ordenes(ordenes)
     print(f"{len(ordenes)} órdenes, {sum(v['unidades'] for v in ventas.values())} unidades")
+
+    print("Canceladas...", end=" ", flush=True)
+    canceladas = traer_ordenes(seller_id, desde, hasta, estado="cancelled")
+    contar_canceladas(canceladas, por_dia)
+    print(len(canceladas))
 
     datos = {
         "generado": hasta.isoformat(),
+        "desde": desde.isoformat(),
         "seller_id": seller_id,
         "site_id": yo.get("site_id"),
         "dias_historial": args.dias,
+        "por_dia": dict(sorted(por_dia.items())),
         "publicaciones": publicaciones,
         "ventas": ventas,
     }
