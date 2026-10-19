@@ -66,6 +66,9 @@ RECETAS = {
     "portacontroles": (40400, 80784, 123),   # 990 puntos = 99 estrías × 10
     "portalapices":   (14114, 28224,  59),   # 504 puntos = 63 estrías × 8
     "portacubiertos": (16530, 33048, 129),   # 632 puntos = 79 estrías × 8
+    # Con perfil oleaje y cresta en M: igual vértice por vértice al .3mf del
+    # catálogo (192.9 × 114.9 × 115.0 mm, voladizo 46.7°).
+    "portacubiertos_oleaje_m": (186878, 373744, 138),
 }
 
 # Los contornos con todo lo demás fijo, para que la única variable sea la
