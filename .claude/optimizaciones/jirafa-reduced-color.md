@@ -166,7 +166,8 @@ Un solo objeto, escala anisotrópica (sin rotación).
 | v6 | 10-18 | Patas ×1.75, pezuña plana (corte 1 mm) y brim de 6 mm | `reduced_color.3mf.v6.bak` |
 | v7 | 10-18 | v6 + soporte `tree_hybrid` (bloque sólido bajo la panza) | `reduced_color.3mf.v7.bak` |
 | v8 | 10-18 | Trompa original, patas ×1.45, cola inflada, cuello +15, `tree_strong` suelto | `reduced_color.3mf.v8.bak` |
-| v9 | 10-18 | v8 con bloque `tree_hybrid` bajo la panza e interfaz suelta | (actual) |
+| v9 | 10-18 | v8 con bloque `tree_hybrid` bajo la panza e interfaz suelta | `reduced_color.3mf.v9.bak` |
+| v10 | 10-18 | Trompa ×1.4 hacia abajo, cuello y patas más delgados, casco proporcionado | (actual) |
 
 ## 2026-10-17 (v4) — "cuando lo imprimí se ve aún muy delgado, el cuello y la cara"
 
@@ -380,6 +381,40 @@ Un solo objeto, escala anisotrópica (sin rotación).
 
 - Pendiente: imprimir; confirmar que la panza no cede y que el bloque se
   despega en una pieza.
+
+## 2026-10-18 (v10) — "de frente la trompa se ve espichada, las patas y el cuello demasiado anchos, el casco no armoniza"
+
+- Feedback sobre el render de la v9 (sin imprimir). Regla nueva del usuario:
+  **antes de armar el 3MF, mostrar la imagen final desde todos los ángulos**
+  (frente, atrás, ambos lados, tres cuartos delante y atrás, arriba y un
+  acercamiento) y esperar el sí. Me detuvo cuando empecé a armar una opción que
+  solo había visto de frente y de lado.
+- Cambios de forma (en el marco de 197 mm, antes de escalar):
+  - **Trompa ×1.4 hacia abajo**: debajo de los ojos (pivote z = 76), solo
+    delante de la garganta (peso `ss(-y,50,58)`). La cara pasa de 31.6 a
+    **37.7 mm** de alto. Se probó ×1.8 con todo 12 % más angosto; el usuario
+    eligió ×1.4.
+  - **Cuello** `kx_cuello` 1.4 → **1.15** y `ky_cuello` 1.35 → 1.25: de
+    frente 29.3 → **24.0 mm**.
+  - **Patas** ×1.45 → **×1.0** (como el original; el usuario eligió P2 sobre
+    P1 ×1.15): 8.1 mm a 12 mm de alto.
+  - **Casco proporcionado** (`casco()`, ×0.88 en los 3–12 mm de abajo de
+    cada pata, alrededor de su centro): el casco quedaba en 13 mm sobre un
+    tobillo de 10 (se veía como bota); ahora ~9 mm, igual que la pata.
+  - Sin cambios: cola inflada y cuello +15 mm (159 mm de alto), con 0 caras
+    invertidas.
+- Contacto por pezuña ~50 mm² (contra 36 en la v5, que falló sin brim) →
+  **brim 6 → 8 mm**. Soporte igual que la v9 (`tree_hybrid`, interfaz suelta);
+  en el gcode, bloque bajo la panza de 653–784 mm², 99.3 % apoyada.
+
+  | Por pieza (CLI, plato de 4) | v9 | v10 |
+  |---|---|---|
+  | Peso | 90.8 g | **84.7 g** |
+  | Tiempo | 4.78 h | **4.55 h** |
+  | Costo | $31.54 | **$30.52** |
+
+- Riesgo conocido: las patas delgadas con poco contacto son el punto débil. Si
+  se despegan, subir a P1 (×1.15, ~62 mm² por pezuña) antes de engrosar más.
 
 ## Pendiente / conocido y no resuelto
 - **Bug propio detectado y corregido en el momento (09-21)**: al escribir las
