@@ -118,9 +118,18 @@ def oleaje(p):
     # se va tendiendo; en 1 sale casi plano y se clava hacia abajo al final,
     # como gancho. La caída total es la misma: sólo cambia dónde se gasta.
     gancho = min(1.0, max(0.0, float(p.get("oleaje_gancho", 0.0))))
+    # Cresta en «M»: la panza sube hacia los extremos (en x) y se hunde al
+    # centro del frente y de la espalda, como el borde de arriba de una M.
+    m_caida = float(p.get("oleaje_m", 0.0))
+    m_ancho = max(0.05, float(p.get("oleaje_m_ancho", 0.35)))
 
     def angular(z, theta):
         fase = z + ladeo * math.cos(theta - dos_pi * giro * z)
+        if m_caida > 0.0:
+            u = math.cos(theta)
+            # Se apaga en la boca y en la base: el labio queda óvalo limpio.
+            fase += (m_caida * math.exp(-(u / m_ancho) ** 2)
+                     * math.sin(math.pi * min(1.0, max(0.0, z))))
         ola = math.sin(dos_pi * (ondas * fase + desfase))
         if reparto > 0.0:
             # `u` es dónde cae la columna a lo largo: −1 en el extremo

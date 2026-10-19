@@ -240,6 +240,18 @@ PARAMETROS = [
               "miran al mismo lado; en 0.5 la de arriba mira al lado "
               "contrario de la de abajo, que es lo que la hace ver retorcida."),
 
+    num("oleaje_m", "Cresta en M", 0.0, 0.0, 0.30, 0.01, "",
+        "Perfil", depende=["oleaje"],
+        ayuda="Hunde la cresta de cada panza al centro del frente y de la "
+              "espalda, y la deja alta en los extremos, como la parte de "
+              "arriba de una M. Se apaga en la boca y en la base. Pasando de "
+              "0.25 el voladizo se dispara: baja la intensidad del perfil."),
+    num("oleaje_m_ancho", "Ancho del hundido de la M", 0.35, 0.10, 1.0, 0.05,
+        "", "Perfil", depende=["oleaje"],
+        ayuda="Qué tanto del frente ocupa el hundido de la M. Chico es un "
+              "pico angosto al centro; hacia 1 baja casi todo el frente y "
+              "solo las puntas quedan altas."),
+
     num("base_redondeo", "Redondeo del fondo", 0.0, 0.0, 70.0, 1.0, "mm",
         "Perfil",
         ayuda="Suaviza el canto de abajo. Es la diferencia entre una cubeta y "
@@ -389,6 +401,30 @@ DISENOS = [
             "pared": 1.8, "piso": 2.0, "ranuras": 3, "divisor_grosor": 1.6,
             "divisor_alto": 78, "drenaje_diametro": 5.0, "drenaje_separacion": 13.0,
             "base_redondeo": 8,
+        },
+    },
+    {
+        # La pieza de la foto del 2026-10-18: óvalo con estría vertical, dos
+        # panzas ladeadas con la cresta en «M» y cuatro compartimentos. Es la
+        # v2 de la receta rápida: pared 1.95 para que el hilo de 0.62 en una
+        # vuelta se toque en el valle de la estría (ver el registro en
+        # .claude/optimizaciones/portacubiertos-oleaje-m.md).
+        "clave": "portacubiertos_oleaje_m",
+        "nombre": "Portacubiertos Oleaje M",
+        "descripcion": "Óvalo con estría y dos panzas en «M», cuatro compartimentos.",
+        "carpeta": "portacubiertos",
+        "valores": {
+            "contorno": "superelipse", "ancho": 180, "fondo": 102,
+            "redondeo": 47, "alto": 115, "acabado": "ondulado",
+            "onda_amplitud": 0.7, "onda_paso": 3.6, "acabado_desvanece": 6,
+            "acabado_cierre": 1.0, "perfil": "oleaje",
+            "perfil_intensidad": 0.064, "oleaje_ondas": 2,
+            "oleaje_inclinacion": 0.04, "oleaje_giro": 0.5,
+            "oleaje_desfase": 0.8, "oleaje_m": 0.23, "oleaje_m_ancho": 0.40,
+            "pared": 1.95, "piso": 1.2, "ranuras": 2, "filas": 2,
+            "divisor_grosor": 2.0, "divisor_alto": 75, "divisor_forma": "ola",
+            "divisor_ola": 3.0, "drenaje_diametro": 0.0, "base_redondeo": 6,
+            "grano": 0.6, "segmentos": 600,
         },
     },
     {
