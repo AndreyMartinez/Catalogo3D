@@ -165,7 +165,8 @@ Un solo objeto, escala anisotrópica (sin rotación).
 | v5 | 10-17 | v4 + soporte que se desprende limpio y bloqueadores pintados | `reduced_color.3mf.v5.bak` |
 | v6 | 10-18 | Patas ×1.75, pezuña plana (corte 1 mm) y brim de 6 mm | `reduced_color.3mf.v6.bak` |
 | v7 | 10-18 | v6 + soporte `tree_hybrid` (bloque sólido bajo la panza) | `reduced_color.3mf.v7.bak` |
-| v8 | 10-18 | Trompa original, patas ×1.45, cola inflada, cuello +15, `tree_strong` suelto | (actual) |
+| v8 | 10-18 | Trompa original, patas ×1.45, cola inflada, cuello +15, `tree_strong` suelto | `reduced_color.3mf.v8.bak` |
+| v9 | 10-18 | v8 con bloque `tree_hybrid` bajo la panza e interfaz suelta | (actual) |
 
 ## 2026-10-17 (v4) — "cuando lo imprimí se ve aún muy delgado, el cuello y la cara"
 
@@ -360,6 +361,25 @@ Un solo objeto, escala anisotrópica (sin rotación).
 - Pendiente: imprimir. Si la panza vuelve a ceder, regresar a `tree_hybrid`
   solo bajo la panza (v7) y aflojar su interfaz (0.5, z 0.24) para que se quite
   más fácil.
+
+## 2026-10-18 (v9) — "vamos de una por algo que no ceda"
+
+- Sin imprimir la v8, el usuario prefirió ir directo a lo más firme bajo la
+  panza. Misma geometría que la v8; único cambio: `support_style`
+  `tree_strong` → **`tree_hybrid`**. Se queda la interfaz suelta de la v8
+  (2 capas a 0.5, z 0.24, xy 0.5): el bloque de la v7 costó quitarlo con
+  interfaz densa (3 capas a 0.2, z 0.2).
+- Gcode: bloque sólido bajo la panza de **743 / 672 / 690 mm²** a 10 / 30 / 40 mm
+  (v8: 314 / 370 / 533), con 99.3 % de la panza apoyada arriba.
+
+  | Por pieza (CLI, plato de 4) | v8 | v9 |
+  |---|---|---|
+  | Peso | 83.5 g | **90.8 g** |
+  | Tiempo | 4.38 h | **4.78 h** |
+  | Costo | $30.32 | **$31.54** |
+
+- Pendiente: imprimir; confirmar que la panza no cede y que el bloque se
+  despega en una pieza.
 
 ## Pendiente / conocido y no resuelto
 - **Bug propio detectado y corregido en el momento (09-21)**: al escribir las
