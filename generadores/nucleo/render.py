@@ -72,11 +72,13 @@ def escribir_png(ruta, ancho, alto, pixeles):
 
 
 def render(vertices, triangulos, tam=512, suavizado=2, direccion=None,
-           color=MATERIAL, fondo=FONDO, ruta=None):
+           color=MATERIAL, fondo=FONDO, ruta=None, crudo=False):
     """Z-buffer con perspectiva suave y luz de tres puntos.
 
     `suavizado=1` es el modo borrador (rápido, para la vista previa);
     `suavizado=2` renderiza al doble y baja, para la miniatura definitiva.
+    Con `crudo=True` devuelve los píxeles RGB sin empaquetar, para armar
+    mosaicos de varias vistas.
     """
     s = max(1, int(suavizado))
     W = H = tam * s
@@ -165,7 +167,7 @@ def render(vertices, triangulos, tam=512, suavizado=2, direccion=None,
             l1_fila += d1y
 
     if s == 1:
-        return escribir_png(ruta, tam, tam, lienzo)
+        return lienzo if crudo else escribir_png(ruta, tam, tam, lienzo)
 
     salida = bytearray(tam * tam * 3)
     total = s * s
@@ -182,4 +184,6 @@ def render(vertices, triangulos, tam=512, suavizado=2, direccion=None,
             salida[i] = r // total
             salida[i + 1] = g // total
             salida[i + 2] = b // total
+    if crudo:
+        return salida
     return escribir_png(ruta, tam, tam, salida)

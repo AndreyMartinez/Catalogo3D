@@ -134,6 +134,27 @@ M10,M11,M12 = -sinθ·sy,  cosθ·sy, 0
 M20,M21,M22 =  0,        0,       sz
 ```
 
+## 2½. Precheck antes de escribir el .3mf
+
+Aplica 2a–2d sobre una copia temporal y, antes de reemplazar el archivo del
+catálogo:
+
+**Precheck desde todos los lados — siempre, antes del 3MF.** Toda forma
+nueva o modificada se enseña antes de armar el `.3mf` del catálogo o laminar:
+
+```bash
+python3 generadores/precheck.py <pieza.3mf|.stl> --salida <scratchpad>/<slug>-vN.precheck.png
+# --zona zmin,zmax agrega una fila de acercamiento a lo que se tocó
+```
+
+Mosaico 3×3 con perspectiva: frente, 3/4 delante der., costado der., 3/4
+atrás der., atrás, 3/4 atrás izq., costado izq., 3/4 delante izq., desde
+arriba. Trabaja sobre una copia temporal; envía el PNG con `SendUserFile`
+**antes** de tablas o números, con medidas al pie, y **espera el visto bueno**.
+Aprobar una o dos vistas no es aprobar la forma: si el usuario solo vio
+algunas, enséñale el mosaico completo. Con el sí, se escribe el `.3mf` del
+catálogo y se lamina — nunca en la misma respuesta que pide la aprobación.
+
 ## 3. Reporte de peso/costo (no lo cambies sin que lo pidan)
 
 Con el volumen sólido-equivalente y el `shell_vol` implícito del paso 1,
@@ -161,3 +182,9 @@ reales — no inventes el número final. Actualiza
 `.claude/optimizaciones/<slug>.md` (crea el archivo si es la primera vez que se
 toca esta pieza, y agrégalo a `INDICE.md`) con qué se aplicó de este preset y
 qué quedó pendiente de confirmar tras Rebanar.
+
+**Cierre: PR + merge automático.** Cuando el usuario dé la tarea por cerrada
+(«listo», «ciérrala», «ya quedó», «PR»), sin preguntar: commit de lo
+versionado, push, PR contra `main` y `gh pr merge <n> --merge`. Avisa con el
+enlace del PR ya fusionado. Lo local (`.claude/productos/`, `.claude/mercado/`,
+`.3mf`) no entra al commit.

@@ -40,7 +40,8 @@ galería, el motor o un skill, propón `sdd`; si es una tarea puntual, hazla.
 - `catalog3d.py` — la galería (servidor local, solo biblioteca estándar).
 - `generadores/` — motor paramétrico de recipientes (`crear.py`, recetas en
   `disenos.py`, núcleo en `nucleo/`) y scripts de piezas propias
-  (`huevo_lowpoly.py`, `portacepillos_rapido.py`…). Si todavía no está en tu
+  (`huevo_lowpoly.py`, `portacepillos_rapido.py`…). `precheck.py` saca el mosaico
+  de vistas desde todos los lados de un `.3mf`/`.stl`. Si todavía no está en tu
   checkout, vive en la copia de trabajo principal sin versionar.
 
 ### Conocimiento versionado (`.claude/`)
@@ -70,3 +71,8 @@ El repo es **público**.
   vende: portacontroles y portacubiertos.
 - Precio, costo y ventas: cítalos del estudio de mercado con su nivel de
   evidencia (medido / correlación / suposición).
+- **Precheck antes del 3MF**: al crear o modificar una pieza (cualquier
+  skill), enseñar el mosaico de `generadores/precheck.py` —todos los lados, con
+  perspectiva— y esperar el visto bueno antes de armar el `.3mf` o laminar.
+- **Cierre = PR + merge, sin preguntar**: cuando el usuario dé la tarea por
+  cerrada, commit, push, PR contra `main` y `gh pr merge --merge` automático.
