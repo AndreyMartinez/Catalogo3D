@@ -33,7 +33,14 @@ aplanados) son mallas aparte metidas en la cabeza; el laminador las une.
 | 9 | Cabeza «recta» (`cabeza_forma`): el cuello sube recto y cierra en media esfera en la nuca; la cabeza es una cuña estriada recta aparte (30° abajo, 46 mm, r 15 → 7.5, 1.25 más alta que ancha, frente recta) con nariz chata (superelipse). Se cruzan y la garganta queda en esquina | foto de jirafa de perfil: «que la curva del hocico no sea una U». La primera cuña (36 mm, 40°) se veía como tubo corto; se alargó, se hizo más alta y se acentuó la cuña |
 | **10** | Frente de la cabeza lisa (`frente_lisa`: seno 0.15 → 0.6 del ángulo de la sección), costados y quijada estriados | el usuario marcó en rojo la frente vista de frente: «volvamos lisa esta parte, el resto me encantó» |
 
-**Elegida: v10** (10-18, «me gustó, sácala»). Respaldos: `.v6.bak`, `.v7.bak`.
+| **11** | Forma del florero-jirafa café de la foto: panza de jarrón abajo (r 31 a z 36, pie r 23) que cierra cóncava a un cuello largo r 12; cabeza de huevo **toda lisa** (`cabeza_lisa`), nuca redonda completa (`cabeza_nuca` 1.0), cráneo ancho que cierra a trompa redonda (`cabeza_afina` 1.4, `nariz_exp` 2, nariz r 11), más agachada (52°); osiconos largos y delgados | foto de una jirafa estriada tipo jarrón: «dale más esta forma» |
+
+**Elegida: v11** (10-18, «me gusta, saca el .3mf»). Respaldos: `.v6.bak`, `.v7.bak`, `.v10.bak`.
+Los valores de la v10 quedan en comentarios junto a cada parámetro de `JIRAFA`.
+El `.v10.bak` (guardado desde Bambu Studio, con gcode adentro) no lo lee el
+CLI («can not be parsed»); para la tabla se regeneró la v10 con esos valores.
+
+**Antes: v10** (10-18, «me gustó, sácala»).
 `cabeza_forma: "curva"` regenera la v7 idéntica (malla verificada).
 
 **Base de trabajo antes de la v9: v7** (10-18, después de descartar la v8). Antes se había
@@ -80,6 +87,20 @@ El soporte crece porque la cuña sale recta en el aire hasta la nariz chata
 soporte. Cuello y cabeza son dos cuerpos que se cruzan dentro de un mismo
 objeto: el laminado salió «Success» sin avisos, pero conviene mirar en Bambu
 Studio que no queden paredes internas donde se cruzan.
+
+### v11 contra v10 (mismos ajustes de laminado, CLI 10-18)
+| | v10 | v11 | Δ |
+|---|---|---|---|
+| Tamaño | 65 × 73 × 169 mm | 69 × 64 × 176 mm | más ancha de panza, cabeza más corta al frente |
+| Peso | 119.2 g | **106.8 g** | −12.4 g |
+| Tiempo (modelo) | 6 h 54 | **5 h 25** | −1 h 29 |
+| Soporte | ≈ 85 min | ≈ 39 min | −46 min |
+| Costo (167 $/kg + $16.38) | $36.29 | **$34.21** | −$2.08 |
+
+Baja casi todo por el soporte: la cabeza agachada y redonda se sostiene sola
+mucho más que la cuña recta de la v10, y sin estrías en la cabeza no hay
+crestas colgando. El cuerpo es más grande (201 cm³ contra 167) pero con
+relleno 15 % pesa poco. Sigue cabiendo acostada en la caja 20×16×11.
 
 ## Pendiente
 - Imprimir el prototipo y revisar: soporte bajo la trompa y las orejas, y si

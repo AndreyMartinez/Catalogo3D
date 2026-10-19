@@ -52,28 +52,40 @@ JIRAFA = {
     # hombros redondos y de ahí los costados bajan casi rectos al pie.
     # Con el hombro corto y los costados rectos se leía como botella de vino:
     # el hombro cae largo y suave, y abajo los costados cierran un poco.
-    "perfil": [(0, 24.5), (3, 26.5), (14, 27.2), (28, 28.2), (36, 28.4),
-               (46, 26.8), (56, 23.2), (66, 19.3), (76, 16.2), (88, 13.9),
-               (104, 12.1), (122, 11.0)],
+    # v11 (foto del florero-jirafa café): panza de jarrón abajo, más ancha
+    # que el pie, que se cierra en curva cóncava hasta un cuello largo casi
+    # parejo. v10: (0, 24.5) (3, 26.5) (14, 27.2) (28, 28.2) (36, 28.4)
+    # (46, 26.8) (56, 23.2) (66, 19.3) (76, 16.2) (88, 13.9) (104, 12.1)
+    # (122, 11.0), nuca 140 / 13.5.
+    "perfil": [(0, 23), (3, 25.5), (12, 28.5), (24, 30.5), (36, 31),
+               (48, 29.5), (60, 25.5), (72, 20.5), (84, 16.5), (96, 14),
+               (110, 12.8), (125, 12.2)],
     # Cómo se une la cabeza. "curva" (v2-v7): el cuello se dobla en arco y se
     # vuelve cabeza. "recta" (v9, foto de jirafa de perfil): el cuello sube
     # recto y cierra redondo en la nuca; la cabeza es una cuña estriada recta
     # que sale del cráneo hacia adelante y abajo. Donde se cruzan queda la
     # esquina de la garganta, en vez de la U que dejaba el arco.
     "cabeza_forma": "recta",
-    "nuca_z": 140.0,          # centro del cráneo
-    "nuca_r": 13.5,           # radio del cuello al cerrar en la nuca
-    "cabeza_baja": 30.0,      # grados bajo la horizontal
+    "nuca_z": 143.0,          # centro del cráneo
+    "nuca_r": 12.0,           # radio del cuello al cerrar en la nuca
+    # v11: cabeza de huevo lisa como la foto: nuca redonda completa, cráneo
+    # ancho que cierra hacia una trompa redonda, más agachada.
+    # v10: baja 30, largo 46, r 15, alto 1.25, cuña 1.0, nariz 7.5 chata 5.
+    "cabeza_baja": 52.0,      # grados bajo la horizontal
     "cabeza_largo": 46.0,     # del cráneo a la punta de la nariz
-    "cabeza_r": 15.0,         # radio de la cuña en el cráneo
-    "cabeza_alto": 1.25,      # la cuña es más alta que ancha, como la quijada
-    "cabeza_cuna": 1.0,       # como `cuna`, para la cabeza recta: frente del todo recta
+    "cabeza_r": 17.0,         # radio de la cuña en el cráneo
+    "cabeza_alto": 1.1,       # la cuña es más alta que ancha, como la quijada
+    "cabeza_cuna": 0.35,      # como `cuna`, para la cabeza recta: 1 = frente del todo recta
+    "cabeza_nuca": 1.0,       # largo de la nuca redonda, en radios (v10: 0.6)
+    "cabeza_afina": 1.4,      # >1 guarda el cráneo ancho antes de afinar (v10: 1)
+    "cabeza_lisa": True,      # sin estrías en la cabeza (v10: solo la frente lisa)
     # v10: la frente (lo que se ve de frente, entre las orejas hasta la nariz)
     # va lisa; las estrías quedan en costados y quijada. Es el ángulo de la
     # sección, en seno, donde empieza a alisar y donde ya es lisa del todo.
     "frente_lisa": (0.15, 0.6),
-    "nariz_r": 7.5,           # radio de la trompa antes de cerrar
-    "nariz_chata": 5.0,       # largo del cierre de la nariz (chato, no bola)
+    "nariz_r": 11.0,          # radio de la trompa antes de cerrar
+    "nariz_chata": 11.0,      # largo del cierre de la nariz
+    "nariz_exp": 2.0,         # 2 redonda; 2.5 chata con canto redondo (v10)
     # Curva del cuello a la cabeza (solo "curva"): arco de este radio y este
     # ángulo. 90° deja el hocico horizontal; más, lo baja.
     "curva_radio": 19.0,
@@ -91,16 +103,17 @@ JIRAFA = {
     # v6 (dibujo de frente): la cara es un triángulo invertido, ancha arriba
     # entre las orejas y angosta en la quijada. La sección de la cabeza se
     # abre arriba y se cierra abajo en esta proporción.
-    "cara_triangulo": 0.5,
+    "cara_triangulo": 0.25,   # v10: 0.5
     "estrias": 26,
     # v7: el surco más hondo y más abierto para que se lea hueco entre cresta
     # y cresta (v6: 2.0 mm, forma 0.55, pleno desde r 13).
     "estria_amplitud": 4.0,   # alto de la cresta sobre el surco
     "estria_forma": 1.0,      # <1 cresta llena y surco en V; más alto, surco más abierto
     "estria_radio_pleno": 9.0,  # por debajo de este radio la estría se apaga
-    "osicono_largo": 11.0,
-    "osicono_r": 3.4,
-    "osicono_bola": 5.0,
+    # v11: osiconos más largos y delgados, punta apenas redonda (v10: 11, 3.4, 5.0)
+    "osicono_largo": 15.0,
+    "osicono_r": 2.6,
+    "osicono_bola": 3.4,
     "osicono_abre": 12.0,     # grados hacia afuera
     "oreja_largo": 21.0,
     "oreja_ancho": 11.0,
@@ -263,19 +276,26 @@ def cabeza_recta(p, paso=0.5):
     # nuca de la cuña: cuarto de esfera hacia atrás
     for k in range(0, 20):
         t = math.pi / 2 * (1 - k / 20)
-        d = -r0 * 0.6 * math.sin(t)
+        d = -r0 * p.get("cabeza_nuca", 0.6) * math.sin(t)
         sec.append((d, r0 * math.cos(t)))
+    # `cabeza_afina` 1 (v9-v10): se afina parejo; más alto (v11, cabeza de
+    # huevo de la foto del florero-jirafa) guarda el cráneo ancho y cierra
+    # hacia la trompa.
+    afina = p.get("cabeza_afina", 1.0)
     for i in range(int(recto / paso) + 1):
         d = i * paso
-        sec.append((d, r0 + (r1 - r0) * d / recto))
-    # nariz chata: superelipse, casi plana al frente con canto redondo
+        sec.append((d, r0 + (r1 - r0) * (d / recto) ** afina))
+    # nariz: superelipse; 2.5 es chata con canto redondo (v9), 2 es redonda
+    ex = p.get("nariz_exp", 2.5)
     for k in range(1, 24):
         u = k / 24
-        sec.append((recto + cierre * u, r1 * (1 - u ** 2.5) ** (1 / 2.5)))
+        sec.append((recto + cierre * u, r1 * (1 - u ** ex) ** (1 / ex)))
     secciones = []
     for d, r in sec:
         sube = p["cabeza_cuna"] * p["cabeza_alto"] * (r0 - max(r, r1)) if d > 0 else 0.0
         apaga = 1 - suave((d - (recto - p["nariz_lisa"])) / p["nariz_lisa"])
+        if p.get("cabeza_lisa"):
+            apaga = 0.0
         secciones.append((oy + dy * d, oz + dz * d, ny, nz, max(r, 0.01), sube, 1.0,
                           apaga))
     sube = p["cabeza_cuna"] * p["cabeza_alto"] * (r0 - r1)
