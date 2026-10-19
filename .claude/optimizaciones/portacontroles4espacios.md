@@ -174,3 +174,68 @@ Pendiente: imprimir la primera placa y revisar (a) la transición 0.2→0.16 a 3
 (no debe verse escalón), (b) que las paredes no subextruyan a 21 mm³/s, (c) que la
 curva no salga peluda. `ironing_type` sigue en "top surface" (= sin planchado, así
 se ha impreso siempre); no se tocó para no sumar tiempo.
+
+## 2026-10-18 (v5) — "el borde de la parte inferior se ve cortado… ¿se puede bajar un poquito el precio?"
+
+Feedback tras imprimir la v4: se perdió un poco de calidad, sobre todo el canto
+inferior se ve cortado. Pidió además bajar costo, «pared 2.2→2.05» y que fuera
+«un tris menos larga».
+
+Diagnóstico:
+- La base trae un **redondeo de ~5.5 mm tangente a la placa**: el contorno pasa de
+  151 mm de ancho en z=0 a 161 mm en z=6. Abajo de ~1.3 mm el voladizo es casi
+  horizontal (hasta 5 mm hacia adentro en z=0.02) → se imprime caído/cortado. Es la
+  misma causa que en [portacontroles03](portacontroles03.md).
+- La v4 cambiaba de capa 0.12 a 0.2 en z=3, a la mitad de ese redondeo: la curva
+  cambiaba de textura a media altura.
+- Costo: la pieza es ~95 % maciza (139.6 cm³ sólidos vs 164.6 g). Bajar techos y
+  pisos (8/5 → 5/4) solo quitó 1.3 g por pieza (manda `top_shell_thickness` 1 mm);
+  adelgazar el hilo interior sin cambiar la malla no ahorra nada (el gap fill
+  rellena el hueco: 660 g y más lento). La única palanca real es la geometría.
+
+Cambios (malla `object_2.model`, la usan las 4 copias):
+- Debajo de z=1.33 el redondeo se cambia por un **chaflán de pendiente 0.8**
+  (39° de la vertical, el tope que funcionó en portacontroles03): corte con
+  manifold3d + contornos desplazados cada 0.03 mm. En z=0 el hueco pasa de 5.1 a
+  2.8 mm. Arriba de 1.33 no se toca (empalma tangente).
+- Pared adelgazada 0.3 mm por cara empujando vértices por su normal, solo donde la
+  pared queda ≥1.75 mm (las puntas de 0.9 mm no se tocan); a z=20 mide 2.05 mm.
+  Ojo: con caras planas grandes el empuje por normal de vértice no da el grosor
+  exacto, hay que medir la sección después.
+- Largo ×0.96 (161 → 154.5 mm; ancho 69.7 y alto 117.4 iguales). Hueco de cada
+  compartimento a z=20: 37.8/36.8 → **36.3/35.3 mm** × 63.9 mm.
+- Rangos de capa: 0.12 hasta **6.5 mm** (antes 3), 0.2 de 6.5 a 38, 0.16 arriba.
+- `inner_wall_line_width` 0.62→0.42 y `outer_wall_line_width` 0.45→0.42
+  (2 vueltas para la pared de 2.05).
+- Malla verificada: watertight, winding consistente, base en z=0, ids de las 4
+  copias iguales. `slice_info` y gcode regenerados con el CLI.
+
+Probado (placa de 4, CLI):
+
+| Variante | Tiempo | Peso |
+|---|---|---|
+| v4 | 16 h 13 | 658.5 g |
+| A: chaflán + capa fina hasta 6.5 | 16 h 17 | 659.7 g |
+| A + pared exterior a 150 mm/s | 17 h 06 | 659.7 g (no aplicado) |
+| A + techos/pisos 5/4 | 16 h 59 | 654.4 g (no vale) |
+| A + hilo interior 0.5 / 0.45 sin cambiar malla | 18 h 26 / 18 h 01 | 660 g (no ahorra) |
+| pared −0.2/cara (2.11 mm), hilos 0.45 | 17 h 08 | 615.3 g |
+| pared −0.3/cara (2.05 mm), hilos 0.42 | 17 h 07 | 589.7 g |
+| **ídem + largo ×0.96 (elegida)** | **16 h 34** | **573.8 g** |
+
+| | v4 | v5 | cambio |
+|---|---|---|---|
+| Placa de 4 | 16 h 13 | 16 h 34 | +21 min |
+| Por pieza | 4 h 03 | 4 h 09 | +6 min |
+| Peso por pieza | 164.6 g | 143.5 g | −21.1 g |
+| Costo por pieza | $43.87 | $40.34 | −$3.53 |
+| Ganancia (retorno $73) | $29.13 | $32.66 | +$3.53 |
+
+Costo = g × 167 $/kg + $16.38 paquetería. Respaldo de la v4:
+`portacontroles4espacios.3mf.v4.bak`.
+
+Pendiente: imprimir y revisar (a) el canto inferior con el chaflán, (b) que los
+controles del usuario entren en huecos de 35.3–36.3 mm, (c) la pared de 2.05 en
+mano. Si vuelve a verse «peor calidad» en las rectas, la palanca es pared exterior
+a 150 mm/s (+50 min la placa). La paquetería incluye maceta regalo + semillas +
+tierra ($5.15); no se tocó.
