@@ -162,7 +162,12 @@ Un solo objeto, escala anisotrópica (sin rotación).
 | v2 | 09-21 | Malla decimada 60k + patas +0.3 mm, ×0.65 → 57×137×165 mm | `reduced_color.3mf.v2.bak` |
 | v3 | 09-28 | Uniforme ×1.20 → 68.5×164.6×197.4 mm, 4 por plato | `reduced_color.3mf.v3.bak` |
 | v4 | 10-17 | Cuello/cara/patas engrosados, 61×125×150 mm, 4 por plato | `reduced_color.3mf.v4.bak` |
-| v5 | 10-17 | v4 + soporte que se desprende limpio y bloqueadores pintados | (actual) |
+| v5 | 10-17 | v4 + soporte que se desprende limpio y bloqueadores pintados | `reduced_color.3mf.v5.bak` |
+| v6 | 10-18 | Patas ×1.75, pezuña plana (corte 1 mm) y brim de 6 mm | `reduced_color.3mf.v6.bak` |
+| v7 | 10-18 | v6 + soporte `tree_hybrid` (bloque sólido bajo la panza) | `reduced_color.3mf.v7.bak` |
+| v8 | 10-18 | Trompa original, patas ×1.45, cola inflada, cuello +15, `tree_strong` suelto | `reduced_color.3mf.v8.bak` |
+| v9 | 10-18 | v8 con bloque `tree_hybrid` bajo la panza e interfaz suelta | `reduced_color.3mf.v9.bak` |
+| v10 | 10-18 | Trompa ×1.4 hacia abajo, cuello y patas más delgados, casco proporcionado | (actual) |
 
 ## 2026-10-17 (v4) — "cuando lo imprimí se ve aún muy delgado, el cuello y la cara"
 
@@ -247,6 +252,169 @@ Un solo objeto, escala anisotrópica (sin rotación).
 - Pendiente: imprimir y revisar con foto si las facetas bloqueadas de la cara o
   los hombros se caen; si alguna sale colgada, quitarle el bloqueador a esa zona
   (o regresar el ángulo a 50°) en vez de volver a la v4.
+
+## 2026-10-18 (v6) — "se dañaron feo en la generación de base, las patas son muy delgadas"
+
+- Impresa la v5: las jirafas se dañaron en la base (no hubo foto; se interpretó
+  como falla de adherencia y estabilidad en las patas).
+- Causa medida en la v5 (150 mm): la pezuña termina redondeada y **toca la
+  placa con solo 31–40 mm² cada una (~6 mm de ancho)**; 1 mm más arriba ya mide
+  ~12 mm. La pata medía ~10 mm de grosor a media altura. Son 4 puntos chicos
+  sosteniendo 150 mm de figura más el soporte de árbol, y el brim era `auto_brim`
+  (30 s en todo el plato, casi nada).
+- Cambios:
+  - **Patas ×1.30 → ×1.75**, con la transición radial ampliada de 11–17 a
+    14–22 mm (en el marco de 197 mm). Probé ×1.6 y ×1.9; ×1.9 dejaba 29 caras
+    invertidas y bultos en los muslos, ×1.75 da 0. Los bultos de las rodillas son
+    del modelo original.
+  - **Corte plano de 1 mm en la base** (`slice_plane` con tapa): el redondeo
+    de la pezuña se va y queda una suela plana. Alto 150 → 149 mm.
+  - **Brim** `auto_brim` → `outer_only`, 6 mm (queda bajo la pezuña, no se ve).
+  - Soporte igual que la v5; bloqueadores recalculados con las mismas reglas
+    sobre la malla nueva: 2070 caras / 671 mm² (los muslos más gruesos agregan
+    facetas de 30–45° en las rodillas).
+- Medidas (150 mm):
+
+  | | v5 | v6 |
+  |---|---|---|
+  | Contacto de cada pezuña con la placa | 31–40 mm² | **183–209 mm²** |
+  | Grosor de pata a 12 mm de alto | ~10 mm | **13.1–13.8 mm** |
+  | Plato de 4 (CLI) | 272.0 g · 17.48 h | **297.2 g · 18.33 h** (brim 4.8 min) |
+  | Por pieza | 68.0 g · 4.37 h · $27.74 | **74.3 g · 4.58 h · $28.79** |
+
+- Pendiente: imprimir y confirmar con foto que la base ya aguanta. Si todavía
+  se mueve, siguen bajar la velocidad y la aceleración de la pared exterior
+  (hoy 200 mm/s y 6000 mm/s²) o agregar `slow_down_layer_time` en las capas
+  delgadas de las patas.
+
+## 2026-10-18 (v7) — "se dañó el centro de nuevo, la panza no funcionó"
+
+- La v6 falló otra vez a media impresión: la cámara de la P2S mostraba
+  filamento enredado sobre la placa y la tarea cancelada.
+- Diagnóstico con el gcode de la v6 (dibujé los trazos de soporte por capa):
+  la panza es una superficie casi plana de ~1300 mm² a **48 mm de altura**,
+  entre las patas. Arriba sí quedaba cubierta (95 % en la capa de 47.8 mm), pero
+  la sostenían **unos pocos troncos de árbol de ~5 mm** que suben desde la placa
+  (ramas de 2 mm, a 150 mm/s, ×4 jirafas). Esa estructura es la que cede.
+- Cambios:
+  - `support_style` default → **`tree_hybrid`**: árbol en puntas y orejas, y
+    soporte normal (bloque en rejilla) bajo superficies grandes y planas. Es el
+    estilo que usan los perfiles de Bambu.
+  - `tree_support_branch_diameter` 2 → **4**; `support_speed` 150 → **100**;
+    `support_top_z_distance` 0.24 → **0.2** (la panza grande cuelga menos;
+    la interfaz densa de 3 capas sigue facilitando el desprendimiento).
+  - Pintura: se quitan los bloqueadores en la franja de 28–56 mm (muslos y
+    panza; quedan 1889 caras / 479 mm² en cara, cuello y patas) y se **fuerza
+    soporte** (`paint_supports="4"`) en las caras de abajo de la panza
+    (3582 caras / 1791 mm², z 43–53, |x|<26, normal hacia abajo).
+- Verificación en gcode: bajo la panza hay un bloque sólido de rejilla desde la
+  placa (~780 mm² a 10 mm de altura, ~640 mm² a 40 mm, contra 145–475 mm² en
+  troncos sueltos en la v6) y la cobertura arriba sube a 99.5 %. Bajo la cabeza
+  sale un tronco de ~15 mm.
+
+  | Por pieza (CLI, plato de 4) | v6 | v7 |
+  |---|---|---|
+  | Peso | 74.3 g | **93.0 g** (+18.7 g, casi todo soporte) |
+  | Tiempo | 4.58 h | **4.96 h** |
+  | Costo | $28.79 | **$31.91** |
+
+- Si funciona y se quiere recortar soporte: subir `support_base_pattern_spacing`
+  de 2.5 a 3.5 (no probado).
+
+## 2026-10-18 (v8) — "el árbol fue demasiado difícil de quitar, la trompa y las patas demasiado anchas, la cola se cayó"
+
+- Resultado de imprimir la v7: el soporte híbrido costó mucho quitarlo; la
+  trompa y las patas quedaron demasiado anchas; la cola se rompió. El usuario
+  pidió resolverlo primero en un boceto a lápiz y después pasarlo a 3D, y además
+  alargar el cuello.
+- Boceto (líneas de facetas proyectadas, estilo lápiz) con medidas a 149 mm,
+  aprobado con las opciones elegidas:
+  - **Trompa a su ancho original**: el ×1.35 de la cara ahora se desvanece
+    hacia el hocico (`ss(y,-68,-58)`): 21.7 → **16.3 mm**.
+  - **Patas ×1.75 → ×1.45**: 13.6 → **11.5 mm** a 12 mm de alto; pezuña plana
+    137 mm² (contra 31–40 en la v5).
+  - **Cola inflada** 1.5 mm por lado (marco de 197 mm) por normal suavizada, con
+    reducción iterativa donde se invertía una cara (escalarla alrededor de su eje
+    invertía caras en la curva): sección de 46 → **120 mm²**, 4.9 → **8.3 mm**.
+  - **Cuello +15 mm** a lo largo de su eje (dirección (0, −0.42, 0.91)), solo
+    en la franja z 28–55 (marco de 197 mm): lineal ahí, la cabeza se traslada
+    sin deformarse. A z0 = 30 quedaban 2 caras invertidas, a 28 ninguna. Se
+    probaron +15 (159 mm de alto) y +25 (166 mm); se eligió +15.
+  - La escala del cuerpo es la misma de la v4–v7 (×150/197.4), así que la
+    figura queda en **61×131×159 mm**; acostada en la caja deja 20 mm de holgura
+    a lo largo y 15 a lo ancho.
+- Soporte "árbol suelto" (elegido): `support_style` **`tree_strong`**,
+  ramas de 4 mm, interfaz 2 capas a 0.5 (suelta), z 0.24, xy 0.5, 100 mm/s; se
+  mantienen el soporte forzado en la panza y los bloqueadores fuera de la franja
+  28–56 (1619 caras / 338 mm²).
+- Verificación en el gcode: bajo la panza sale **un tronco grueso continuo**
+  a lo largo de cada panza (314–370 mm² a 10–30 mm de alto), contra troncos
+  sueltos en la v6 (145–242 mm²) y el bloque de la v7 (~750 mm²); 98 % de la
+  panza apoyada arriba.
+
+  | Por pieza (CLI, plato de 4) | v7 | v8 |
+  |---|---|---|
+  | Alto | 149 mm | **159 mm** |
+  | Peso | 93.0 g | **83.5 g** |
+  | Tiempo | 4.96 h | **4.38 h** |
+  | Costo | $31.91 | **$30.32** |
+
+- Pendiente: imprimir. Si la panza vuelve a ceder, regresar a `tree_hybrid`
+  solo bajo la panza (v7) y aflojar su interfaz (0.5, z 0.24) para que se quite
+  más fácil.
+
+## 2026-10-18 (v9) — "vamos de una por algo que no ceda"
+
+- Sin imprimir la v8, el usuario prefirió ir directo a lo más firme bajo la
+  panza. Misma geometría que la v8; único cambio: `support_style`
+  `tree_strong` → **`tree_hybrid`**. Se queda la interfaz suelta de la v8
+  (2 capas a 0.5, z 0.24, xy 0.5): el bloque de la v7 costó quitarlo con
+  interfaz densa (3 capas a 0.2, z 0.2).
+- Gcode: bloque sólido bajo la panza de **743 / 672 / 690 mm²** a 10 / 30 / 40 mm
+  (v8: 314 / 370 / 533), con 99.3 % de la panza apoyada arriba.
+
+  | Por pieza (CLI, plato de 4) | v8 | v9 |
+  |---|---|---|
+  | Peso | 83.5 g | **90.8 g** |
+  | Tiempo | 4.38 h | **4.78 h** |
+  | Costo | $30.32 | **$31.54** |
+
+- Pendiente: imprimir; confirmar que la panza no cede y que el bloque se
+  despega en una pieza.
+
+## 2026-10-18 (v10) — "de frente la trompa se ve espichada, las patas y el cuello demasiado anchos, el casco no armoniza"
+
+- Feedback sobre el render de la v9 (sin imprimir). Regla nueva del usuario:
+  **antes de armar el 3MF, mostrar la imagen final desde todos los ángulos**
+  (frente, atrás, ambos lados, tres cuartos delante y atrás, arriba y un
+  acercamiento) y esperar el sí. Me detuvo cuando empecé a armar una opción que
+  solo había visto de frente y de lado.
+- Cambios de forma (en el marco de 197 mm, antes de escalar):
+  - **Trompa ×1.4 hacia abajo**: debajo de los ojos (pivote z = 76), solo
+    delante de la garganta (peso `ss(-y,50,58)`). La cara pasa de 31.6 a
+    **37.7 mm** de alto. Se probó ×1.8 con todo 12 % más angosto; el usuario
+    eligió ×1.4.
+  - **Cuello** `kx_cuello` 1.4 → **1.15** y `ky_cuello` 1.35 → 1.25: de
+    frente 29.3 → **24.0 mm**.
+  - **Patas** ×1.45 → **×1.0** (como el original; el usuario eligió P2 sobre
+    P1 ×1.15): 8.1 mm a 12 mm de alto.
+  - **Casco proporcionado** (`casco()`, ×0.88 en los 3–12 mm de abajo de
+    cada pata, alrededor de su centro): el casco quedaba en 13 mm sobre un
+    tobillo de 10 (se veía como bota); ahora ~9 mm, igual que la pata.
+  - Sin cambios: cola inflada y cuello +15 mm (159 mm de alto), con 0 caras
+    invertidas.
+- Contacto por pezuña ~50 mm² (contra 36 en la v5, que falló sin brim) →
+  **brim 6 → 8 mm**. Soporte igual que la v9 (`tree_hybrid`, interfaz suelta);
+  en el gcode, bloque bajo la panza de 653–784 mm², 99.3 % apoyada.
+
+  | Por pieza (CLI, plato de 4) | v9 | v10 |
+  |---|---|---|
+  | Peso | 90.8 g | **84.7 g** |
+  | Tiempo | 4.78 h | **4.55 h** |
+  | Costo | $31.54 | **$30.52** |
+
+- Riesgo conocido: las patas delgadas con poco contacto son el punto débil. Si
+  se despegan, subir a P1 (×1.15, ~62 mm² por pezuña) antes de engrosar más.
 
 ## Pendiente / conocido y no resuelto
 - **Bug propio detectado y corregido en el momento (09-21)**: al escribir las
