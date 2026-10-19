@@ -126,11 +126,28 @@ la ficha elegida, cada ronda y cada decisión con su porqué.
 - Antes de cerrar, pásalo por `/transform` (perfil, placa llena, soporte); no
   repitas aquí esa receta.
 
+**Precheck desde todos los lados — siempre, antes del 3MF.** Toda forma
+nueva o modificada se enseña antes de armar el `.3mf` del catálogo o laminar:
+
+```bash
+python3 generadores/precheck.py <pieza.3mf|.stl> --salida <scratchpad>/<slug>-vN.precheck.png
+# --zona zmin,zmax agrega una fila de acercamiento a lo que se tocó
+```
+
+Mosaico 3×3 con perspectiva: frente, 3/4 delante der., costado der., 3/4
+atrás der., atrás, 3/4 atrás izq., costado izq., 3/4 delante izq., desde
+arriba. Trabaja sobre una copia temporal; envía el PNG con `SendUserFile`
+**antes** de tablas o números, con medidas al pie, y **espera el visto bueno**.
+Aprobar una o dos vistas no es aprobar la forma: si el usuario solo vio
+algunas, enséñale el mosaico completo. Con el sí, se escribe el `.3mf` del
+catálogo y se lamina — nunca en la misma respuesta que pide la aprobación.
+
 ```bash
 python3 .claude/skills/producto-nuevo/scripts/tablero.py fase <slug> diseno --nota "ronda 3: ..."
 ```
 
-**Pausa 3.** El usuario aprueba la versión a imprimir.
+**Pausa 3.** El usuario aprueba la versión a imprimir **viendo el mosaico
+de precheck completo**; recién entonces se arma el `.3mf`.
 
 ## 4. Prototipo impreso
 
@@ -187,6 +204,15 @@ alimenta la siguiente ronda de propuestas. Y llévalo al estudio vivo: el
 producto entra en §5 («Productos en desarrollo») al publicarse, y su veredicto
 pasa a §2 (hallazgo, con su nivel de evidencia) al cerrarse. Así la rutina del
 domingo lo vigila sin que nadie se acuerde.
+
+
+## Cierre de la tarea
+
+**Cierre: PR + merge automático.** Cuando el usuario dé la tarea por cerrada
+(«listo», «ciérrala», «ya quedó», «PR»), sin preguntar: commit de lo
+versionado, push, PR contra `main` y `gh pr merge <n> --merge`. Avisa con el
+enlace del PR ya fusionado. Lo local (`.claude/productos/`, `.claude/mercado/`,
+`.3mf`) no entra al commit.
 
 ## Dónde vive cada cosa
 

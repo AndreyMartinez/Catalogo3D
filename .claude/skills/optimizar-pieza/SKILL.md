@@ -145,6 +145,27 @@ misma proporción en que baja `layer_height` (mismo grosor sólido en mm, más c
 `ironing_type` → `"top"` (no `"top surface"`: Bambu no lo reconoce y lo vuelve
 `no ironing` sin avisar; ver transform §2a), `detect_thin_wall` → `"1"`.
 
+## 4½. Precheck antes de escribir
+
+**Precheck desde todos los lados — siempre, antes del 3MF.** Toda forma
+nueva o modificada se enseña antes de armar el `.3mf` del catálogo o laminar:
+
+```bash
+python3 generadores/precheck.py <pieza.3mf|.stl> --salida <scratchpad>/<slug>-vN.precheck.png
+# --zona zmin,zmax agrega una fila de acercamiento a lo que se tocó
+```
+
+Mosaico 3×3 con perspectiva: frente, 3/4 delante der., costado der., 3/4
+atrás der., atrás, 3/4 atrás izq., costado izq., 3/4 delante izq., desde
+arriba. Trabaja sobre una copia temporal; envía el PNG con `SendUserFile`
+**antes** de tablas o números, con medidas al pie, y **espera el visto bueno**.
+Aprobar una o dos vistas no es aprobar la forma: si el usuario solo vio
+algunas, enséñale el mosaico completo. Con el sí, se escribe el `.3mf` del
+catálogo y se lamina — nunca en la misma respuesta que pide la aprobación.
+
+Si el cambio es solo de perfil (capa, ironing, paredes en el laminador) y la
+malla no cambia, el mosaico igual se enseña: es lo que se va a imprimir.
+
 ## 5. Escribe el archivo — los dos tropiezos que ya no debes repetir
 
 **Backup siempre primero**: si no existe `<archivo>.3mf.bak`, cópialo antes de tocar
@@ -245,6 +266,12 @@ números al lado. Hazlo siempre, lo pida o no:
   la fecha y `(vN)`.
 - **Al cerrar, díselo al usuario**: qué versión quedó, cuál quedó respaldada y la
   tabla de tiempo, peso y costo contra la anterior.
+
+**Cierre: PR + merge automático.** Cuando el usuario dé la tarea por cerrada
+(«listo», «ciérrala», «ya quedó», «PR»), sin preguntar: commit de lo
+versionado, push, PR contra `main` y `gh pr merge <n> --merge`. Avisa con el
+enlace del PR ya fusionado. Lo local (`.claude/productos/`, `.claude/mercado/`,
+`.3mf`) no entra al commit.
 
 Escribe/actualiza `.claude/optimizaciones/<slug>.md` (usa el nombre de carpeta o
 archivo del diseño como slug) con este formato:
