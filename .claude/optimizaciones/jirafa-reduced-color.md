@@ -164,7 +164,8 @@ Un solo objeto, escala anisotrópica (sin rotación).
 | v4 | 10-17 | Cuello/cara/patas engrosados, 61×125×150 mm, 4 por plato | `reduced_color.3mf.v4.bak` |
 | v5 | 10-17 | v4 + soporte que se desprende limpio y bloqueadores pintados | `reduced_color.3mf.v5.bak` |
 | v6 | 10-18 | Patas ×1.75, pezuña plana (corte 1 mm) y brim de 6 mm | `reduced_color.3mf.v6.bak` |
-| v7 | 10-18 | v6 + soporte `tree_hybrid` (bloque sólido bajo la panza) | (actual) |
+| v7 | 10-18 | v6 + soporte `tree_hybrid` (bloque sólido bajo la panza) | `reduced_color.3mf.v7.bak` |
+| v8 | 10-18 | Trompa original, patas ×1.45, cola inflada, cuello +15, `tree_strong` suelto | (actual) |
 
 ## 2026-10-17 (v4) — "cuando lo imprimí se ve aún muy delgado, el cuello y la cara"
 
@@ -317,6 +318,48 @@ Un solo objeto, escala anisotrópica (sin rotación).
 
 - Si funciona y se quiere recortar soporte: subir `support_base_pattern_spacing`
   de 2.5 a 3.5 (no probado).
+
+## 2026-10-18 (v8) — "el árbol fue demasiado difícil de quitar, la trompa y las patas demasiado anchas, la cola se cayó"
+
+- Resultado de imprimir la v7: el soporte híbrido costó mucho quitarlo; la
+  trompa y las patas quedaron demasiado anchas; la cola se rompió. El usuario
+  pidió resolverlo primero en un boceto a lápiz y después pasarlo a 3D, y además
+  alargar el cuello.
+- Boceto (líneas de facetas proyectadas, estilo lápiz) con medidas a 149 mm,
+  aprobado con las opciones elegidas:
+  - **Trompa a su ancho original**: el ×1.35 de la cara ahora se desvanece
+    hacia el hocico (`ss(y,-68,-58)`): 21.7 → **16.3 mm**.
+  - **Patas ×1.75 → ×1.45**: 13.6 → **11.5 mm** a 12 mm de alto; pezuña plana
+    137 mm² (contra 31–40 en la v5).
+  - **Cola inflada** 1.5 mm por lado (marco de 197 mm) por normal suavizada, con
+    reducción iterativa donde se invertía una cara (escalarla alrededor de su eje
+    invertía caras en la curva): sección de 46 → **120 mm²**, 4.9 → **8.3 mm**.
+  - **Cuello +15 mm** a lo largo de su eje (dirección (0, −0.42, 0.91)), solo
+    en la franja z 28–55 (marco de 197 mm): lineal ahí, la cabeza se traslada
+    sin deformarse. A z0 = 30 quedaban 2 caras invertidas, a 28 ninguna. Se
+    probaron +15 (159 mm de alto) y +25 (166 mm); se eligió +15.
+  - La escala del cuerpo es la misma de la v4–v7 (×150/197.4), así que la
+    figura queda en **61×131×159 mm**; acostada en la caja deja 20 mm de holgura
+    a lo largo y 15 a lo ancho.
+- Soporte "árbol suelto" (elegido): `support_style` **`tree_strong`**,
+  ramas de 4 mm, interfaz 2 capas a 0.5 (suelta), z 0.24, xy 0.5, 100 mm/s; se
+  mantienen el soporte forzado en la panza y los bloqueadores fuera de la franja
+  28–56 (1619 caras / 338 mm²).
+- Verificación en el gcode: bajo la panza sale **un tronco grueso continuo**
+  a lo largo de cada panza (314–370 mm² a 10–30 mm de alto), contra troncos
+  sueltos en la v6 (145–242 mm²) y el bloque de la v7 (~750 mm²); 98 % de la
+  panza apoyada arriba.
+
+  | Por pieza (CLI, plato de 4) | v7 | v8 |
+  |---|---|---|
+  | Alto | 149 mm | **159 mm** |
+  | Peso | 93.0 g | **83.5 g** |
+  | Tiempo | 4.96 h | **4.38 h** |
+  | Costo | $31.91 | **$30.32** |
+
+- Pendiente: imprimir. Si la panza vuelve a ceder, regresar a `tree_hybrid`
+  solo bajo la panza (v7) y aflojar su interfaz (0.5, z 0.24) para que se quite
+  más fácil.
 
 ## Pendiente / conocido y no resuelto
 - **Bug propio detectado y corregido en el momento (09-21)**: al escribir las
