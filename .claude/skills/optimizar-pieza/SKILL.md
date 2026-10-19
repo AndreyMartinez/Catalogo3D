@@ -215,6 +215,11 @@ assert z.testzip() is None                       # zip no corrupto
 ```
 
 Reabre con `open -a "BambuStudio" "<ruta>"` y pide al usuario que le dé **Rebanar** —
+**ojo:** si Bambu Studio ya tiene un proyecto abierto (por ejemplo la versión
+anterior que abriste antes), `open -a` **importa** el archivo dentro de ese proyecto
+y quedan las dos versiones encimadas en la placa (pasó con la jirafa v4+v5, 10-17).
+Antes de reabrir, pasa Bambu a un proyecto vacío (`Archivo › Nuevo proyecto`) o
+ábrelo desde `Archivo › Proyectos recientes`; el archivo en disco no se afecta —
 el gramaje que trae el archivo es el de la rebanada vieja hasta que él lo vuelva a
 rebanar. No inventes un número final; da el estimado del paso 3 como aproximación y
 pide el real.
