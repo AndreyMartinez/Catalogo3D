@@ -142,12 +142,14 @@ no solo tamaño absoluto.
 Perfil típico que subió calidad sin subir peso (el relleno/paredes no cambian):
 `layer_height` 0.2→0.12, `top_shell_layers` y `bottom_shell_layers` súbelos en la
 misma proporción en que baja `layer_height` (mismo grosor sólido en mm, más capas),
-`ironing_type` → `"top surface"`, `detect_thin_wall` → `"1"`.
+`ironing_type` → `"top"` (no `"top surface"`: Bambu no lo reconoce y lo vuelve
+`no ironing` sin avisar; ver transform §2a), `detect_thin_wall` → `"1"`.
 
 ## 5. Escribe el archivo — los dos tropiezos que ya no debes repetir
 
 **Backup siempre primero**: si no existe `<archivo>.3mf.bak`, cópialo antes de tocar
-nada.
+nada. Y cada ajuste es una versión nueva: respalda también la que reemplazas (ver
+**Versionamiento** en el paso 6).
 
 **Tropiezo #1 — el perfil de impresión se revierte solo.** `Metadata/project_settings.config`
 es JSON. Cambiar una clave (`wall_loops`, `layer_height`, `sparse_infill_density`,
@@ -218,6 +220,26 @@ rebanar. No inventes un número final; da el estimado del paso 3 como aproximaci
 pide el real.
 
 ## 6. Antes de cerrar: actualiza el registro
+
+### Versionamiento — cada ajuste es una versión (pedido del usuario, 2026-10-08)
+
+Al usuario le sirve ver la pieza como una serie de versiones (v1, v2, …) con
+números al lado. Hazlo siempre, lo pida o no:
+
+- **Una ronda de feedback que cambia el archivo = una versión nueva.** Antes de
+  escribir, respalda la que está en el catálogo como `<archivo>.3mf.vN.bak` y su
+  miniatura como `<archivo>.png.vN.bak` (N = la versión que se reemplaza). El
+  `.bak` sin número sigue siendo el original de fábrica.
+- **Tiempo, peso y costo en cada versión, sin que lo pidan.** Lamina con el CLI de
+  Bambu Studio cuando se pueda (si no, el estimado del paso 3, dicho como
+  estimado). Costo = gramos × `precio_kg`/1000 + paquetería (paso 2), por pieza o
+  por juego. Si probaste variantes, mídelas todas y ponlas en la misma tabla.
+- **En el registro, una sección por versión**: `## <fecha> (vN) — "<frase del
+  usuario>"` con el feedback, los cambios antes→después, la tabla contra la
+  versión anterior y el nombre del respaldo. En `INDICE.md` el estado empieza con
+  la fecha y `(vN)`.
+- **Al cerrar, díselo al usuario**: qué versión quedó, cuál quedó respaldada y la
+  tabla de tiempo, peso y costo contra la anterior.
 
 Escribe/actualiza `.claude/optimizaciones/<slug>.md` (usa el nombre de carpeta o
 archivo del diseño como slug) con este formato:
