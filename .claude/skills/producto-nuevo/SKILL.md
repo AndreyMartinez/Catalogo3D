@@ -44,7 +44,7 @@ python3 .claude/skills/producto-nuevo/scripts/tablero.py ver
   `~/.catalogo3d/ml_datos.json` (las baja `colecta-full`). `tablero.py ver`
   imprime la línea base por categoría; si los datos tienen más de 7 días,
   ofrece refrescar con
-  `python3 .claude/skills/colecta-full/scripts/traer_datos.py --dias 90`.
+  `python3 .claude/skills/colecta-full/scripts/traer_datos.py --dias 125`.
 
 Contexto de negocio (verifícalo si pasó tiempo): marca **Savia Raíz**,
 MercadoLibre México, precio típico **$198–219 MXN** con «regalos sorpresa /

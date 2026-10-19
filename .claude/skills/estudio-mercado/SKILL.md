@@ -1,6 +1,6 @@
 ---
 name: estudio-mercado
-description: Rutina semanal de análisis de mercado del negocio en MercadoLibre — baja ventas reales, calcula las cifras de la semana, revisa la competencia en el navegador y escribe el reporte del domingo, actualizando el estudio de mercado vivo (.claude/mercado/estudio-de-mercado.md) que leen los demás skills. Úsalo cuando el usuario pida el resumen o análisis de la semana, el estudio de mercado, cómo van las ventas, qué producto conviene lanzar o mandar a Full, o cuando lo dispare la tarea programada del domingo.
+description: Rutina semanal de análisis de mercado del negocio en MercadoLibre — baja ventas reales, calcula las cifras de la semana, revisa la competencia en el navegador y escribe el reporte del domingo, actualizando el estudio de mercado vivo (.claude/mercado/estudio-de-mercado.md) que leen los demás skills. Úsalo cuando el usuario pida el resumen o análisis de la semana, el estudio de mercado, cómo van las ventas, cómo va el mes o las ventas del mes (corte mensual con proyección al cierre), qué producto conviene lanzar o mandar a Full, o cuando lo dispare la tarea programada del domingo.
 ---
 
 # Estudio de mercado semanal
@@ -15,10 +15,14 @@ Produce cada semana, de lunes a domingo:
 Lee primero el estudio vigente. Ahí están los hallazgos anteriores y lo que
 quedó pendiente de validar; el reporte nuevo los confirma o los corrige.
 
+Si la pregunta es por **el mes** («¿cómo vienen las ventas del mes?», «¿cómo
+vamos en octubre?»), no hagas la rutina semanal: ve a «¿Cómo va el mes?» al
+final.
+
 ## Paso 1 — Datos de ventas
 
 ```bash
-python3 .claude/skills/colecta-full/scripts/traer_datos.py --dias 90
+python3 .claude/skills/colecta-full/scripts/traer_datos.py --dias 125
 python3 .claude/skills/estudio-mercado/scripts/semana.py
 ```
 
@@ -94,6 +98,47 @@ En `.claude/mercado/estudio-de-mercado.md`:
 Si corre como tarea programada, termina con un resumen corto para el usuario:
 las 5 líneas del resumen y la ruta del reporte. Si faltó la sesión de ML,
 eso va primero.
+
+## ¿Cómo va el mes?
+
+Corte del mes en curso, cualquier día: lo vendido del 1 al último día
+completo, contra el mes anterior **al mismo día**, la proyección al cierre y
+qué publicaciones lo mueven. Sin competencia y sin tocar el estudio vivo.
+
+```bash
+python3 .claude/skills/colecta-full/scripts/traer_datos.py --dias 125
+python3 .claude/skills/estudio-mercado/scripts/mes.py
+```
+
+- Si ya se bajaron datos hoy, corre solo `mes.py`.
+- Si `traer_datos.py` falla por sesión, haz lo mismo que en el Paso 1: sigue
+  con lo guardado, dilo, y pide al usuario que corra `login.py`. No inicies
+  sesión tú.
+- `--mes AAAA-MM` analiza un mes cerrado (mes contra mes, sin proyección).
+  `--meta N` o `--meta-pesos N` si el usuario da una meta.
+- Deja `.claude/mercado/meses/AAAA-MM.json` y `.md`.
+
+Luego:
+
+1. Reemplaza en el `.md` la línea `5. _Recomendación: (la escribe el skill)_`
+   por **una sola cosa** que haría el usuario, con el dato en que se apoya y
+   su nivel (medido / correlación / suposición). Cruza con el estudio vivo:
+   si la caída está en una categoría que ya tiene hipótesis, dilo.
+2. Contesta con las 5 líneas del resumen y lo que el usuario haya preguntado
+   en concreto; la ruta del reporte al final.
+
+Cómo leerlo:
+
+- La proyección es siempre **suposición**. Con menos de 7 días, ni eso:
+  dilo antes de dar la cifra.
+- «Base chica» (menos de 10 unidades) significa que el porcentaje no se
+  muestra porque engañaría; habla en unidades.
+- El día de la descarga va a medias y no entra al ritmo; aparece como «hoy,
+  parcial».
+- La ganancia parcial cubre solo las ventas con diseño vinculado en el
+  catálogo; la extrapolada es suposición. Nunca uses el neto de `/orders`.
+- Full / no Full es según la logística actual de cada publicación, no la de
+  cada orden.
 
 ## Qué NO hacer
 

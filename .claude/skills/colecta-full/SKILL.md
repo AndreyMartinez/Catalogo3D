@@ -19,7 +19,7 @@ Antes de presentar el plan, lee `.claude/mercado/estudio-de-mercado.md`: ahí es
 ## Flujo
 
 ```bash
-python3 .claude/skills/colecta-full/scripts/traer_datos.py --dias 90
+python3 .claude/skills/colecta-full/scripts/traer_datos.py --dias 125
 python3 .claude/skills/colecta-full/scripts/plan.py
 ```
 
