@@ -46,6 +46,8 @@ Malla reescrita en mm de mundo (transform de escala 1), script en el scratchpad
 | v1 (0.12 mm, gordito +7 %) | 3 | 20 h 35 m | 501 g | 6.9 h · 167 g | $27.9 |
 
 | v2 (0.16 mm, relleno rayo 10 %) | 3 | 11 h 02 m | 227 g | 3.7 h · 76 g | $12.6 |
+| v3 (franja 0.08 + planchado en la cabeza) | 3 | 10 h 07 m | 198 g | 3.4 h · 66 g | $11.0 |
+| v4 (×1.055, 20 cm de largo) | 3 | 11 h 02 m | 221 g | 3.7 h · 74 g | $12.3 |
 
 (Material a 167 $/kg, sin paquetería. Medido por CLI de Bambu.)
 
@@ -58,6 +60,26 @@ peso (en una figura solo sostiene el lomo); eligió 0.16+rayo.
 - Pidió «un poco más alto»: no entra en la caja 20×16×11 (va justo, 157 de 160) y
   girado de lado tampoco gana — la diagonal cabeza–punta de cola es más larga.
   Se quedó en 157 mm.
+
+## v3 (2026-10-19) — sin registrar en su momento
+Respaldo de v2: `Perro labrado.3mf.v2.bak`. Rango de capa z=100–155 mm a 0.08 mm con
+planchado `top` (cabeza). Re-laminado el 10-20 por CLI: 10 h 07 m, 198 g el plato.
+
+## v4 (2026-10-20) — 20 cm de largo, cabe en la caja
+Respaldo de v3: `Perro labrado.3mf.v3.bak`. Pidió «otro poquito más alto» y que entre
+acostado en la caja de 20 (largo) × 16 (ancho) × 11 (alto).
+- La nota de v2 («más alto no cabe») solo probaba giros en el plano. **Inclinado en 3D**
+  dentro de la caja el máximo es ×1.083 con 2 mm por lado (búsqueda de rotación sobre
+  el casco convexo). Se eligió **×1.055 uniforme → 80.8 × 199.9 × 163.5 mm**
+  (20 × 16.4 × 8.1 cm): ocupa 192×152×102 mm inclinado, 8 mm de holgura en cada eje.
+  Acostado plano no entra (toca justo los 200 mm).
+- Rango fino de la cabeza escalado igual: 105.5–163.53 mm.
+- **Plato: siguen 3.** Ya no caben en la disposición de v2 (el Y pasaba de 256): los tres
+  girados (≈67°, 225°, 14°), 9 mm entre cascos y 10 mm al borde (el árbol sale ~10 mm
+  por los costados). Extrusión del G-code en X 10–246, Y 9–245.
+- Miniatura `plate_1.png` por `--export-png`, `slice_info.config` del CLI.
+- Publicación MLM6330391398 corregida por API (decía 34 cm / 1.56 kg): alto 16.4, largo
+  20, ancho 8.1 cm, 75 g; paquete 20×16×11 cm, 300 g (cajas «que no pesan nada»).
 
 ## Pendiente
 - Imprimir y ver si la panza sale limpia con organic + interfaz densa y si la cola ya
