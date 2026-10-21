@@ -102,3 +102,37 @@ de esos ajustes** — solo el empaque. Respaldo del estado del usuario: `gato_ja
 - Pendiente: que el usuario imprima y confirme que los soportes entre gatos encajados se retiran bien.
 - Lección: al empacar piezas con soporte de árbol (`support_on_build_plate_only=0`), empacar la
   huella silueta+soporte medida del rebanado, no la silueta sola.
+
+## v3 (2026-10-21) — menos gramos sin que se sienta hueco
+Respaldo de v2: `gato_japandi.3mf.v2.bak`. Misma forma, tamaño (97.6 × 152.2 × 200.2 mm →
+en la caja 20×16×11 va acostado, ya la llena: escala máxima con 2 mm por lado 0.979) y plato
+de 4. Solo perfil:
+- `sparse_infill_pattern` adaptivecubic → **lightning** (8 %): el relleno solo sostiene techos.
+- `wall_generator` classic → **arachne** (orejas, cola).
+- `inner_wall_line_width` 0.45 → **0.60**: piel de ~1 mm con 2 vueltas; da cuerpo sin
+  agregar pasadas (mismo tiempo que lightning solo, +12 g).
+
+Laminado por CLI, plato de 4:
+
+| Variante | Plato | Por gato | Costo/gato |
+|---|---|---|---|
+| v2 (adaptive 8 %, classic) | 18 h 21 m · 562 g | 4.6 h · 140 g | $39.84 |
+| lightning + arachne | 16 h 28 m · 328 g | 4.1 h · 82 g | $30.07 |
+| **v3: lightning + arachne + pared interior 0.60** | **16 h 22 m · 377 g** | **4.1 h · 94 g** | **$32.14** |
+| lightning + 3 paredes | 21 h 46 m · 463 g | 5.4 h · 116 g | $35.72 |
+| v3 + piso 12 capas | 20 h 47 m · 472 g | 5.2 h · 118 g | $36.10 |
+| lightning + capa 0.16 | 21 h 32 m · 350 g | 5.4 h · 88 g | $30.99 |
+
+(Costo = g × 0.167 + $16.38.)
+
+- **Rango de capas con `sparse_infill_density` tumba el CLI** (segfault 139); con
+  `layer_height` sí lamina. Un modificador de caja en la base (`modifier_part` en
+  `model_settings.config` + componente con objeto propio) carga, pero el CLI rechaza el plato
+  («no object fully inside») aunque se copie la matriz de la pieza. Si hace falta peso abajo,
+  agregarlo desde Bambu Studio (Agregar modificador → Caja, relleno 40 %, primeros 30 mm).
+- Publicación MLM2956493425: peso 94 g; paquete corregido 27×18×19 → 20×16×11 cm, 300 g;
+  medidas en atributos (aceptados aunque la categoría «Otros» no los muestre) y en la descripción.
+
+### Pendiente
+- Imprimir uno y confirmar en mano que no se siente hueco y que los techos (cabeza, orejas)
+  cierran bien sobre el relleno rayo.
