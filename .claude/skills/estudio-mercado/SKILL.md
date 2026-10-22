@@ -140,6 +140,23 @@ Cómo leerlo:
 - Full / no Full es según la logística actual de cada publicación, no la de
   cada orden.
 
+## ¿Ganamos o perdimos?
+
+Ganancia o pérdida por día y por semana, con todo: comisión, envío,
+publicidad (con IVA), material, luz y los cargos que la API no ve.
+
+```bash
+python3 .claude/skills/estudio-mercado/scripts/dia.py --corte AAAA-MM-DD
+```
+
+- Por defecto, los últimos 30 días cerrados; `--desde`/`--hasta` para otro
+  rango, `--corte` para comparar antes/después de un cambio.
+- Publicidad: `product_ads/ads/search` con `aggregation_type=DAILY`, que sí
+  cuenta campañas borradas (`campaigns/search` no).
+- Otros cargos ($12.7/orden) y retenciones (7.8 %) salen del reporte de
+  septiembre: suposición. El envío reciente puede ser provisional.
+- Deja `.claude/mercado/dias/tendencia.md` y `.json`.
+
 ## Qué NO hacer
 
 - No cambies precios, publicaciones, stock ni nada en la cuenta de ML. Este
