@@ -19,8 +19,11 @@ así que no lleva soportes.
 """
 
 import argparse
+import json
 import math
+import re
 import sys
+import zipfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -316,6 +319,84 @@ def bandeja(v, b):
 
 # ── Salida ────────────────────────────────────────────────────────────────
 
+# Perfil del P2S con Bambu PLA Basic (0.20 Standard), tomado del florero. El
+# florero trae relleno 0 % y 3 capas de techo: aquí se regresan a los de
+# fábrica (15 %, 5), que la bandeja y el zócalo los necesitan. Se quedan
+# Arachne (las costillas de cordón son cáscara curva de 2.4 mm) y resolución
+# 0.05: con 0.012 la malla redonda da tramitos que nunca alcanzan velocidad.
+AJUSTES_P2S = (Path.home() / "Desktop" / "own design 3d"
+               / "General_Vases_print_profile(5).3mf")
+LAMINADO = {"sparse_infill_density": "15%", "skeleton_infill_density": "15%",
+            "skin_infill_density": "15%", "top_shell_layers": "5",
+            "wall_generator": "arachne", "resolution": "0.05",
+            "infill_combination": "1",
+            # Cada costilla es una isla por capa (14 por vaso): con 1 mm el
+            # laminador retraía también al saltar de pared a pared dentro de
+            # la misma costilla. Con 5 solo retrae entre costillas: 24 mil →
+            # 16 mil retracciones y 2 h 45 → 2 h 29 por vaso.
+            "retraction_minimum_travel": "5"}
+DE_FABRICA = {"sparse_infill_density", "skeleton_infill_density",
+              "skin_infill_density", "top_shell_layers"}
+# Por objeto (por nombre): el peso de la bandeja es el relleno de sus paredes
+# de 4.5 mm. Al 10 % pesa 115 g en vez de 125 y tarda 11 min menos. Hacer
+# huecas las cinturas por dentro salió peor (133 g, +22 min): el relleno ya
+# las dejaba huecas y la cavidad suma paredes.
+POR_OBJETO = {"bandeja": {"sparse_infill_density": "10%"}}
+
+
+def modelo_settings(modelo):
+    """Metadata/model_settings.config: un bloque por objeto (ids uno a uno)
+    con los ajustes de POR_OBJETO."""
+    xml = ['<?xml version="1.0" encoding="UTF-8"?>', "<config>"]
+    objetos = re.findall(r'<object id="(\d+)" type="model" name="([^"]*)"', modelo)
+    for oid, nom in objetos:
+        xml += ['  <object id="%s">' % oid,
+                '    <metadata key="name" value="%s"/>' % nom,
+                '    <metadata key="extruder" value="1"/>']
+        for clave, ajustes in POR_OBJETO.items():
+            if clave in nom:
+                xml += ['    <metadata key="%s" value="%s"/>' % kv
+                        for kv in sorted(ajustes.items())]
+        xml += ['    <part id="1" subtype="normal_part">',
+                '      <metadata key="name" value="%s"/>' % nom,
+                "    </part>", "  </object>"]
+    xml += ["  <plate>", '    <metadata key="plater_id" value="1"/>']
+    for oid, _ in objetos:
+        xml += ["    <model_instance>",
+                '      <metadata key="object_id" value="%s"/>' % oid,
+                '      <metadata key="instance_id" value="0"/>',
+                "    </model_instance>"]
+    xml += ["  </plate>", "</config>"]
+    return "\n".join(xml).encode("utf-8")
+
+
+def embeber_ajustes(ruta, ajustes):
+    """Copia project_settings.config de `ajustes` (un .3mf de Bambu Studio)
+    con LAMINADO encima, y declara el .3mf de Bambu Studio: sin el metadato
+    Application el laminador ignora los ajustes y usa los genéricos."""
+    with zipfile.ZipFile(ajustes) as z:
+        cfg = json.loads(z.read("Metadata/project_settings.config"))
+    cfg.update(LAMINADO)
+    dif = cfg.get("different_settings_to_system") or [""]
+    cambios = set(filter(None, dif[0].split(";"))) | set(LAMINADO)
+    dif[0] = ";".join(sorted(cambios - DE_FABRICA))
+    cfg["different_settings_to_system"] = dif
+    with zipfile.ZipFile(ruta) as z:
+        todo = {n: z.read(n) for n in z.namelist()}
+    todo["Metadata/project_settings.config"] = json.dumps(cfg, indent=4).encode()
+    modelo = todo["3D/3dmodel.model"].decode("utf-8")
+    modelo = modelo.replace(
+        '<metadata name="Title">',
+        '<metadata name="Application">BambuStudio-02.07.01.62</metadata>\n'
+        '<metadata name="BambuStudio:3mfVersion">1</metadata>\n'
+        '<metadata name="Title">', 1)
+    todo["3D/3dmodel.model"] = modelo.encode("utf-8")
+    todo["Metadata/model_settings.config"] = modelo_settings(modelo)
+    with zipfile.ZipFile(ruta, "w", zipfile.ZIP_DEFLATED) as z:
+        for n, b in todo.items():
+            z.writestr(n, b)
+
+
 def gramos(m):
     return round(abs(m.volumen()) / 1000.0 * DENSIDAD, 1)
 
@@ -338,6 +419,8 @@ def main():
         ap.add_argument("--" + k.replace("_", "-"), dest=k, type=float, default=None)
     ap.add_argument("--alto-vaso", type=float, default=None)
     ap.add_argument("--alto-bandeja", type=float, default=None)
+    ap.add_argument("--ajustes", default=str(AJUSTES_P2S),
+                    help="otro .3mf del que copiar los ajustes de laminado ('' = ninguno)")
     a = ap.parse_args()
 
     v, b = dict(VASO), dict(BANDEJA)
@@ -374,6 +457,8 @@ def main():
     exportar.guardar_3mf(piezas, ruta, a.nombre, miniatura=png, notas=notas,
                          parametros=dict(v, **{"bandeja_" + k: x for k, x in b.items()},
                                          diseno="portacubiertos_trenzado"))
+    if a.ajustes and Path(a.ajustes).exists():
+        embeber_ajustes(ruta, a.ajustes)
     exportar.guardar_stl(piezas, ruta.with_suffix(".stl"), a.nombre)
     exportar.guardar_stl([("juego", juego, 0, 0)],
                          carpeta / (a.nombre + "_armado.stl"), a.nombre)
@@ -382,7 +467,8 @@ def main():
     print("%s" % ruta)
     print("  Vaso     %.0f × %.0f mm, %d costillas a %.0f°  ≈ %s g (suma de sólidos encimados)"
           % (2 * r_max, v["alto"], v["costillas"], v["inclinacion"], gv))
-    print("  Bandeja  %.1f × %.1f × %.0f mm  ≈ %s g" % (bx1 - bx0, by1 - by0, bz1, gb))
+    print("  Bandeja  %.1f × %.1f × %.0f mm  ≈ %s g de malla maciza (laminada"
+          " al 10 %% de relleno pesa ~115 g)" % (bx1 - bx0, by1 - by0, bz1, gb))
     print("  Juego    %.1f × %.1f × %.1f mm armado"
           % tuple(hi - lo for lo, hi in zip(*juego.caja())))
     print("  Aristas sueltas bandeja: %d" % ban.aristas_sueltas())
