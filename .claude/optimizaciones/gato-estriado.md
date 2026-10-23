@@ -43,7 +43,11 @@ y barbilla: ~50 g).
 - Surco que se cierra en punta: angostar el surco (min(c, k)/k), no solo bajarle
   hondura; pide ~40 columnas por estría o salen dientes.
 
+## Publicación
+- 2026-10-23: **MLM3699686229** «Gato Estriado Decorativo Minimalista Más Regalos Sorpresa Negro», $219, 6 u, despacho propio (xd_drop_off), paquete 20×16×11 / 198 g, 5 fotos. El mismo día: Flex activado, y premium + envío gratis junto con las demás publicaciones nuevas; anuncio en la campaña de lanzamiento (ROAS 5, $50/día).
+
 ## Pendiente
+- **Licencia del Katze Japandi (ChrisB)**: confirmar que permite vender derivados; la publicación ya está activa.
 - Imprimir el prototipo a 30°: revisar la barbilla (sin copa cuelga) y las
   orejas. Si la barbilla sale fea, 40° (+$2).
 - Medir la caja por dentro: 200 mm es justo.
