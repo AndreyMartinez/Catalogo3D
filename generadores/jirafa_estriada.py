@@ -205,11 +205,13 @@ def tubo(p, secciones, punta, por_estria=10, frente_lisa=None):
     apaga): centro y normal en el plano y-z, radio, cuánto sube el centro
     (cuña), cuánto es cabeza (ancho y cara en triángulo) y cuánto queda de
     estría. Cierra plano abajo y en `punta` (y, z) arriba. Con `frente_lisa`
-    (seno donde empieza, seno donde ya es lisa) el lado de arriba va liso."""
+    (seno donde empieza, seno donde ya es lisa) el lado de arriba va liso;
+    un tercer elemento opcional da, por sección, cuánto se alisa (0 a 1)."""
     cols = p["estrias"] * por_estria
     m = M.Malla()
     anillos = []
-    for py, pz, ny, nz, r, sube, h, apaga in secciones:
+    pesos = frente_lisa[2] if frente_lisa and len(frente_lisa) > 2 else None
+    for f, (py, pz, ny, nz, r, sube, h, apaga) in enumerate(secciones):
         k = 1 + (p["ancho"] - 1) * h
         tri = p["cara_triangulo"] * h
         fila = []
@@ -217,8 +219,8 @@ def tubo(p, secciones, punta, por_estria=10, frente_lisa=None):
             a = 2 * math.pi * j / cols
             ap = apaga
             if frente_lisa:
-                s0, s1 = frente_lisa
-                ap *= 1 - suave((math.sin(a) - s0) / (s1 - s0))
+                s0, s1 = frente_lisa[:2]
+                ap *= 1 - (pesos[f] if pesos else 1) * suave((math.sin(a) - s0) / (s1 - s0))
             rr = r + estria(p, a, r, ap)
             cx = rr * k * math.cos(a) * (1 + tri * math.sin(a))
             cn = rr * math.sin(a) * (1 + (p.get("cabeza_alto", 1) - 1) * h) + sube
