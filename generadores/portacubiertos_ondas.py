@@ -10,7 +10,7 @@ fina. La boca queda a una sola altura.
     python3 portacubiertos_ondas.py --salida /ruta --nombre MiPieza
     python3 portacubiertos_ondas.py --ondas 4 --amplitud 2.5 --solo-stl
 
-La planta es el contorno de tres lóbulos del trenzado; a cada altura el radio
+La planta es el contorno de tres lóbulos del trenzado v7 (copiado aquí); a cada altura el radio
 de los lóbulos cambia con las ondas, y la estría se reparte por fracción del
 perímetro, así cada canal sube recto sin torcerse. Por dentro la pared es
 lisa: valle de dos hilos (ver la regla en tiempo-lo-manda-el-numero-de-trazos).
@@ -28,7 +28,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from nucleo import exportar, malla as M, render                 # noqa: E402
-from portacubiertos_trenzado import tres_lobulos                # noqa: E402
 from portacepillos_rapido import ajustes_por_objeto             # noqa: E402
 
 PRUEBAS = Path.home() / "Desktop" / "own design 3d" / "Pruebas de productos"
@@ -55,6 +54,34 @@ P = {
     "dz": 0.8,               # entre anillos
     "puntos_estria": 6,
 }
+
+
+# ── Planta: tres lóbulos (del trenzado v7) ──────────────────────────────
+
+def _arco(cx, cy, r, a0, a1, n):
+    return [(cx + r * math.cos(a0 + (a1 - a0) * i / n),
+             cy + r * math.sin(a0 + (a1 - a0) * i / n)) for i in range(n)]
+
+
+def tres_lobulos(R, f, d, desfase=0.0, n_lobulo=96, n_cintura=24):
+    """Contorno de tres círculos de radio R en fila (centros a -d, 0, d) unidos
+    por redondeos cóncavos de radio f. Con `desfase` se corre todo el contorno
+    hacia afuera (+) o adentro (−) sin perder la correspondencia punto a punto:
+    los centros de los arcos no cambian, solo sus radios."""
+    Rc, fc = R + desfase, f - desfase
+    yf = math.sqrt((R + f) ** 2 - (d / 2.0) ** 2)
+    hacia_der = math.atan2(yf, d / 2.0)        # de un centro al redondeo de su derecha
+    hacia_izq = math.atan2(yf, -d / 2.0)
+    pts = []
+    pts += _arco(d, 0, Rc, -hacia_izq, hacia_izq, 2 * n_lobulo)         # lóbulo der.
+    pts += _arco(d / 2, yf, fc, -hacia_der, -math.pi + hacia_der, n_cintura)
+    pts += _arco(0, 0, Rc, hacia_der, hacia_izq, n_lobulo)              # centro arriba
+    pts += _arco(-d / 2, yf, fc, -hacia_der, -math.pi + hacia_der, n_cintura)
+    pts += _arco(-d, 0, Rc, hacia_der, 2 * math.pi - hacia_der, 2 * n_lobulo)  # izq.
+    pts += _arco(-d / 2, -yf, fc, math.pi - hacia_der, hacia_der, n_cintura)
+    pts += _arco(0, 0, Rc, -hacia_izq, -hacia_der, n_lobulo)            # centro abajo
+    pts += _arco(d / 2, -yf, fc, math.pi - hacia_der, hacia_der, n_cintura)
+    return pts
 
 
 def radio(p, z):

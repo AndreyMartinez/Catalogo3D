@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Portacubiertos trenzado: tres vasos de costillas en espiral, caladas, sobre
-una bandeja de tres lóbulos.
+"""Portacubiertos trenzado: vasos de costillas en espiral, caladas, sobre una
+bandeja de un lóbulo por vaso (2 por omisión; `--vasos 3` es el de la foto).
 
 Sale de una foto de referencia (10-22): vasos color nogal con costillas
 redondas que suben inclinadas y dejan rendijas entre sí, metidos en una
@@ -19,8 +19,11 @@ así que no lleva soportes.
 """
 
 import argparse
+import json
 import math
+import re
 import sys
+import zipfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -50,6 +53,10 @@ VASO = {
 }
 
 BANDEJA = {
+    "vasos": 2,              # 2 caben armados en la caja de 20 × 16 × 11 (con 3,
+                             # la bandeja mide 25 cm y no entra)
+    "largo": 196.0,          # mm de la bandeja: los vasos se ensanchan (mismo alto,
+                             # misma forma de huevo) hasta llenarlo; 0 = los de VASO
     "holgura": 0.8,          # entre vaso y bandeja, de cada lado
     "pared": 4.5,
     "piso": 1.6,
@@ -180,8 +187,13 @@ def _arco(cx, cy, r, a0, a1, n):
              cy + r * math.sin(a0 + (a1 - a0) * i / n)) for i in range(n)]
 
 
-def tres_lobulos(R, f, d, desfase=0.0, n_lobulo=96, n_cintura=24):
-    """Contorno de tres círculos de radio R en fila (centros a -d, 0, d) unidos
+def centros_de(n, d):
+    """Centros de n vasos en fila, a d entre sí, con el del medio en x = 0."""
+    return [(i - (n - 1) / 2.0) * d for i in range(n)]
+
+
+def lobulos(R, f, d, n, desfase=0.0, n_lobulo=96, n_cintura=24):
+    """Contorno de n círculos de radio R en fila (a d entre centros) unidos
     por redondeos cóncavos de radio f. Con `desfase` se corre todo el contorno
     hacia afuera (+) o adentro (−) sin perder la correspondencia punto a punto:
     los centros de los arcos no cambian, solo sus radios."""
@@ -189,15 +201,17 @@ def tres_lobulos(R, f, d, desfase=0.0, n_lobulo=96, n_cintura=24):
     yf = math.sqrt((R + f) ** 2 - (d / 2.0) ** 2)
     hacia_der = math.atan2(yf, d / 2.0)        # de un centro al redondeo de su derecha
     hacia_izq = math.atan2(yf, -d / 2.0)
-    pts = []
-    pts += _arco(d, 0, Rc, -hacia_izq, hacia_izq, 2 * n_lobulo)         # lóbulo der.
-    pts += _arco(d / 2, yf, fc, -hacia_der, -math.pi + hacia_der, n_cintura)
-    pts += _arco(0, 0, Rc, hacia_der, hacia_izq, n_lobulo)              # centro arriba
-    pts += _arco(-d / 2, yf, fc, -hacia_der, -math.pi + hacia_der, n_cintura)
-    pts += _arco(-d, 0, Rc, hacia_der, 2 * math.pi - hacia_der, 2 * n_lobulo)  # izq.
-    pts += _arco(-d / 2, -yf, fc, math.pi - hacia_der, hacia_der, n_cintura)
-    pts += _arco(0, 0, Rc, -hacia_izq, -hacia_der, n_lobulo)            # centro abajo
-    pts += _arco(d / 2, -yf, fc, math.pi - hacia_der, hacia_der, n_cintura)
+    cs = centros_de(n, d)
+    pts = _arco(cs[-1], 0, Rc, -hacia_izq, hacia_izq, 2 * n_lobulo)    # lóbulo der.
+    for i in range(n - 2, -1, -1):                                     # por arriba
+        pts += _arco(cs[i] + d / 2, yf, fc, -hacia_der, -math.pi + hacia_der, n_cintura)
+        if i > 0:
+            pts += _arco(cs[i], 0, Rc, hacia_der, hacia_izq, n_lobulo)
+    pts += _arco(cs[0], 0, Rc, hacia_der, 2 * math.pi - hacia_der, 2 * n_lobulo)  # izq.
+    for i in range(n - 1):                                             # por abajo
+        pts += _arco(cs[i] + d / 2, -yf, fc, math.pi - hacia_der, hacia_der, n_cintura)
+        if i < n - 2:
+            pts += _arco(cs[i + 1], 0, Rc, -hacia_izq, -hacia_der, n_lobulo)
     return pts
 
 
@@ -214,6 +228,8 @@ def bandeja(v, b):
         return radio_ext(v, min(z, z_panza) - alza) + b["holgura"]
 
     d = 2 * v["radio_panza"] + b["separacion"]
+    n_vasos = int(b["vasos"])
+    cs = centros_de(n_vasos, d)
     f_int, pared = b["cintura"], b["pared"]
     r_lab = pared / 2.0
     z_max = b["alto"]
@@ -228,12 +244,12 @@ def bandeja(v, b):
     def contorno(desfase, i):
         if (desfase, i) not in cache:
             R = r_min + (r_max - r_min) * i / (N - 1)
-            pts = tres_lobulos(R, f_int, d, desfase)
+            pts = lobulos(R, f_int, d, n_vasos, desfase)
             if desfase > 0 and b["recto"]:
                 # Por fuera, frente y espalda van rectos de lóbulo a lóbulo:
                 # las cinturas se rellenan hasta la línea que toca los tres.
                 y_linea = R + desfase
-                pts = [(x, math.copysign(y_linea, y)) if abs(x) <= d else (x, y)
+                pts = [(x, math.copysign(y_linea, y)) if abs(x) <= cs[-1] else (x, y)
                        for x, y in pts]
             cache[(desfase, i)] = pts
         return cache[(desfase, i)]
@@ -251,7 +267,7 @@ def bandeja(v, b):
         s = 0.5 + 0.5 * math.sin(math.pi / 2 * max(-1.0, min(1.0, y / fondo)))
         h = b["alto_frente"] + (b["alto"] - b["alto_frente"]) * s
         caida = b["caida"] + (b["caida_atras"] - b["caida"]) * s
-        u = abs(x) - d / 2.0
+        u = min(abs(x - c - d / 2.0) for c in cs[:-1])
         return h - caida * math.exp(-(u / (0.32 * d)) ** 2)
 
     medio = contorno(r_lab, N - 1)
@@ -303,7 +319,7 @@ def bandeja(v, b):
     # Tres costillitas por lóbulo, radiales a 90°, 210° y 330°: el agua corre
     # entre ellas y los agujeros del vaso (30°, 150°, 270°) caen en los huecos.
     m.normalizar()
-    for cx in (-d, 0.0, d):
+    for cx in cs:
         for a in (math.pi / 2, 7 * math.pi / 6, 11 * math.pi / 6):
             ca, sa = math.cos(a), math.sin(a)
             r0, r1, w = 6.0, r_patas - 4.0, 1.0
@@ -311,10 +327,108 @@ def bandeja(v, b):
                     for r, t in ((r0, -w), (r1, -w), (r1, w), (r0, w))]
             m.unir(M.placa(M.orientar(pata), [], b["piso"] - 0.01,
                            b["piso"] + b["patas"]))
-    return m, (-d, 0.0, d)
+    return m, cs
+
+
+def ajustar_al_largo(v, b):
+    """Ensancha (o angosta) los vasos para que la bandeja mida `largo`: los
+    tres radios del huevo crecen parejo y las costillas se multiplican igual,
+    así cada costilla sigue del mismo ancho. El alto no cambia."""
+    n = int(b["vasos"])
+    rp = ((b["largo"] - (n - 1) * b["separacion"] - 2 * (b["holgura"] + b["pared"]))
+          / (2.0 * n))
+    k = rp / v["radio_panza"]
+    for clave in ("radio_base", "radio_panza", "radio_boca"):
+        v[clave] = round(v[clave] * k, 2)
+    v["costillas"] = int(round(v["costillas"] * k))
 
 
 # ── Salida ────────────────────────────────────────────────────────────────
+
+# Perfil del P2S con Bambu PLA Basic (0.20 Standard), tomado del florero. El
+# florero trae relleno 0 % y 3 capas de techo: aquí se regresan a los de
+# fábrica (15 %, 5), que la bandeja y el zócalo los necesitan. Se quedan
+# Arachne (las costillas de cordón son cáscara curva de 2.4 mm) y resolución
+# 0.05: con 0.012 la malla redonda da tramitos que nunca alcanzan velocidad.
+AJUSTES_P2S = (Path.home() / "Desktop" / "own design 3d"
+               / "General_Vases_print_profile(5).3mf")
+LAMINADO = {"sparse_infill_density": "15%", "skeleton_infill_density": "15%",
+            "skin_infill_density": "15%", "top_shell_layers": "5",
+            "wall_generator": "arachne", "resolution": "0.05",
+            "infill_combination": "1",
+            # Cada costilla es una isla por capa (14 por vaso): con 1 mm el
+            # laminador retraía también al saltar de pared a pared dentro de
+            # la misma costilla. Con 5 solo retrae entre costillas: 24 mil →
+            # 16 mil retracciones y 2 h 45 → 2 h 29 por vaso.
+            "retraction_minimum_travel": "5"}
+DE_FABRICA = {"sparse_infill_density", "skeleton_infill_density",
+              "skin_infill_density", "top_shell_layers"}
+# Por objeto (por nombre): el peso de la bandeja es el relleno de sus paredes
+# de 4.5 mm. Al 10 % pesa 115 g en vez de 125 y tarda 11 min menos. Hacer
+# huecas las cinturas por dentro salió peor (133 g, +22 min): el relleno ya
+# las dejaba huecas y la cavidad suma paredes.
+#
+# Las costillas del vaso (cáscara de 2.4 mm) tienen por dentro menos de 15 mm²
+# y el laminador las llenaba de relleno sólido. Con el área mínima en 0 llevan
+# relleno ligero entre sus dos paredes: 54.5 → 49.3 g y 2 h 29 → 2 h 03 por
+# vaso, sin cambiar la forma. Con una sola pared bajaba a 37.4 g, pero la piel
+# de la costilla queda de 0.45 mm: se descartó por frágil.
+POR_OBJETO = {"bandeja": {"sparse_infill_density": "10%"},
+              "vaso": {"minimum_sparse_infill_area": "0"}}
+
+
+def modelo_settings(modelo):
+    """Metadata/model_settings.config: un bloque por objeto (ids uno a uno)
+    con los ajustes de POR_OBJETO."""
+    xml = ['<?xml version="1.0" encoding="UTF-8"?>', "<config>"]
+    objetos = re.findall(r'<object id="(\d+)" type="model" name="([^"]*)"', modelo)
+    for oid, nom in objetos:
+        xml += ['  <object id="%s">' % oid,
+                '    <metadata key="name" value="%s"/>' % nom,
+                '    <metadata key="extruder" value="1"/>']
+        for clave, ajustes in POR_OBJETO.items():
+            if clave in nom:
+                xml += ['    <metadata key="%s" value="%s"/>' % kv
+                        for kv in sorted(ajustes.items())]
+        xml += ['    <part id="1" subtype="normal_part">',
+                '      <metadata key="name" value="%s"/>' % nom,
+                "    </part>", "  </object>"]
+    xml += ["  <plate>", '    <metadata key="plater_id" value="1"/>']
+    for oid, _ in objetos:
+        xml += ["    <model_instance>",
+                '      <metadata key="object_id" value="%s"/>' % oid,
+                '      <metadata key="instance_id" value="0"/>',
+                "    </model_instance>"]
+    xml += ["  </plate>", "</config>"]
+    return "\n".join(xml).encode("utf-8")
+
+
+def embeber_ajustes(ruta, ajustes):
+    """Copia project_settings.config de `ajustes` (un .3mf de Bambu Studio)
+    con LAMINADO encima, y declara el .3mf de Bambu Studio: sin el metadato
+    Application el laminador ignora los ajustes y usa los genéricos."""
+    with zipfile.ZipFile(ajustes) as z:
+        cfg = json.loads(z.read("Metadata/project_settings.config"))
+    cfg.update(LAMINADO)
+    dif = cfg.get("different_settings_to_system") or [""]
+    cambios = set(filter(None, dif[0].split(";"))) | set(LAMINADO)
+    dif[0] = ";".join(sorted(cambios - DE_FABRICA))
+    cfg["different_settings_to_system"] = dif
+    with zipfile.ZipFile(ruta) as z:
+        todo = {n: z.read(n) for n in z.namelist()}
+    todo["Metadata/project_settings.config"] = json.dumps(cfg, indent=4).encode()
+    modelo = todo["3D/3dmodel.model"].decode("utf-8")
+    modelo = modelo.replace(
+        '<metadata name="Title">',
+        '<metadata name="Application">BambuStudio-02.07.01.62</metadata>\n'
+        '<metadata name="BambuStudio:3mfVersion">1</metadata>\n'
+        '<metadata name="Title">', 1)
+    todo["3D/3dmodel.model"] = modelo.encode("utf-8")
+    todo["Metadata/model_settings.config"] = modelo_settings(modelo)
+    with zipfile.ZipFile(ruta, "w", zipfile.ZIP_DEFLATED) as z:
+        for n, b in todo.items():
+            z.writestr(n, b)
+
 
 def gramos(m):
     return round(abs(m.volumen()) / 1000.0 * DENSIDAD, 1)
@@ -338,6 +452,8 @@ def main():
         ap.add_argument("--" + k.replace("_", "-"), dest=k, type=float, default=None)
     ap.add_argument("--alto-vaso", type=float, default=None)
     ap.add_argument("--alto-bandeja", type=float, default=None)
+    ap.add_argument("--ajustes", default=str(AJUSTES_P2S),
+                    help="otro .3mf del que copiar los ajustes de laminado ('' = ninguno)")
     a = ap.parse_args()
 
     v, b = dict(VASO), dict(BANDEJA)
@@ -346,6 +462,8 @@ def main():
             val = getattr(a, k, None)
             if val is not None:
                 dic[k] = val
+    if b["largo"]:
+        ajustar_al_largo(v, b)
     v["costillas"] = int(v["costillas"])
     if a.alto_vaso:
         v["alto"] = a.alto_vaso
@@ -364,16 +482,17 @@ def main():
                         ruta=ruta.with_suffix(".png"))
     (bx0, by0, _), (bx1, by1, bz1) = ban.caja()
     r_max = v["radio_panza"]
-    # Plato: la bandeja arriba, los tres vasos en fila abajo.
+    # Plato: la bandeja arriba, los vasos en fila abajo.
     piezas = [("bandeja", ban, PLATO / 2, 8 + (by1 - by0) / 2)]
     y_vasos = 8 + (by1 - by0) + 6 + r_max
-    for i in range(3):
-        piezas.append(("vaso %d" % (i + 1), vaso_m,
-                       PLATO / 2 + (i - 1) * (2 * r_max + 6), y_vasos))
-    notas = "%s · 3 vasos + bandeja" % a.nombre
+    for i, x in enumerate(centros_de(len(centros), 2 * r_max + 6)):
+        piezas.append(("vaso %d" % (i + 1), vaso_m, PLATO / 2 + x, y_vasos))
+    notas = "%s · %d vasos + bandeja" % (a.nombre, len(centros))
     exportar.guardar_3mf(piezas, ruta, a.nombre, miniatura=png, notas=notas,
                          parametros=dict(v, **{"bandeja_" + k: x for k, x in b.items()},
                                          diseno="portacubiertos_trenzado"))
+    if a.ajustes and Path(a.ajustes).exists():
+        embeber_ajustes(ruta, a.ajustes)
     exportar.guardar_stl(piezas, ruta.with_suffix(".stl"), a.nombre)
     exportar.guardar_stl([("juego", juego, 0, 0)],
                          carpeta / (a.nombre + "_armado.stl"), a.nombre)
@@ -382,7 +501,8 @@ def main():
     print("%s" % ruta)
     print("  Vaso     %.0f × %.0f mm, %d costillas a %.0f°  ≈ %s g (suma de sólidos encimados)"
           % (2 * r_max, v["alto"], v["costillas"], v["inclinacion"], gv))
-    print("  Bandeja  %.1f × %.1f × %.0f mm  ≈ %s g" % (bx1 - bx0, by1 - by0, bz1, gb))
+    print("  Bandeja  %.1f × %.1f × %.0f mm  ≈ %s g de malla maciza (el relleno"
+          " al 10 %% la deja en menos de la mitad)" % (bx1 - bx0, by1 - by0, bz1, gb))
     print("  Juego    %.1f × %.1f × %.1f mm armado"
           % tuple(hi - lo for lo, hi in zip(*juego.caja())))
     print("  Aristas sueltas bandeja: %d" % ban.aristas_sueltas())
