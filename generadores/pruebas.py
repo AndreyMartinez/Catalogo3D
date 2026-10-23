@@ -69,6 +69,9 @@ RECETAS = {
     # Con perfil oleaje y cresta en M: igual vértice por vértice al .3mf del
     # catálogo (192.9 × 114.9 × 115.0 mm, voladizo 46.7°).
     "portacubiertos_oleaje_m": (186878, 373744, 138),
+    # Acabado meandro (lóbulos alternados) en óvalo de barril: igual al .3mf de
+    # Pruebas de productos (205.8 × 100.2 × 112.2 mm).
+    "portacubiertos_meandro": (248118, 496224, 332),
 }
 
 # Los contornos con todo lo demás fijo, para que la única variable sea la
