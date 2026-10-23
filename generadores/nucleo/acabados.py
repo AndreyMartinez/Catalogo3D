@@ -328,6 +328,71 @@ def martillado(p, perimetro):
                    periodos_z=max(nz, int(math.ceil(nz * 1.41))))
 
 
+def meandro(p, perimetro):
+    """Lóbulos abultados que se alternan: uno gordo arriba, el vecino gordo
+    abajo, encajados como piezas de rompecabezas.
+
+    Es el portacubiertos de piedra de la foto del 2026-10-22. La primera
+    versión eran bandas paralelas con el borde en «S» y se leía como espiral
+    —una tela torcida—; en la foto cada lóbulo es una gota o un bolo con su
+    propio bulbo, y el bulbo de uno cae frente al cuello del de al lado. El
+    surco que queda entre los dos es el que dibuja la «S».
+
+    Cada lóbulo es una almohada: cara un poco abombada y canto redondo de
+    `meandro_canto` mm, sin arista donde se agarre la uña. Sólo pone material
+    (hunde=0), como el junco: el surco es la pared nominal. Abajo el lóbulo
+    se cierra redondo antes de la base; arriba llega hasta la boca.
+
+    El número de lóbulos es par a la fuerza, o el último choca con el
+    primero en la costura con el mismo bulbo. El primero se centra en el
+    frente del rectángulo para que el frente salga simétrico.
+    """
+    paso = max(10.0, float(p.get("meandro_paso", 60.0)))
+    n = max(2, int(round(perimetro / paso / 2.0)) * 2)
+    pr = perimetro / n                                  # lóbulo + surco, en mm
+    a = p["onda_amplitud"]
+    alto = float(p["alto"])
+    surco = min(0.8, max(0.05, float(p.get("meandro_surco", 0.30))))
+    gordura = float(p.get("meandro_cintura", 0.35))     # cuánto cambia de ancho
+    vaiven = float(p.get("meandro_vaiven", 0.0))        # corre de lado, en pasos
+    canto = max(0.5, float(p.get("meandro_canto", 4.0)))
+    pie = float(p.get("meandro_pie", 6.0))              # mm sin lóbulo sobre la base
+    h0 = pr * (1.0 - surco) / 2.0                       # medio ancho de lóbulo
+    centro = 0.0
+    if p.get("contorno") == "rectangulo":
+        r = min(p["redondeo"], p["ancho"] / 2.0, p["fondo"] / 2.0)
+        centro = (p["ancho"] / 2.0 - r) / perimetro
+    elif p.get("contorno") == "superelipse":
+        # Arranca en el extremo derecho y gira antihorario: el centro del
+        # frente queda a tres cuartos de vuelta.
+        centro = 0.75
+
+    def ancho(k, z):
+        # Bulbo arriba (z≈0.78) y cuello abajo, o al revés en el vecino.
+        pico = 0.78 if k % 2 == 0 else 0.22
+        return h0 * (1.0 + gordura * math.cos(TAU * (z - pico)))
+
+    def fn(s, z):
+        x = ((s - centro) % 1.0) * perimetro
+        k0 = int(math.floor(x / pr + 0.5))
+        zmm = z * alto
+        ez = zmm - pie
+        mejor = 0.0
+        for k in (k0 - 1, k0, k0 + 1):
+            signo = 1.0 if k % 2 == 0 else -1.0
+            xc = k * pr + signo * vaiven * pr * math.sin(TAU * z)
+            h = ancho(k % n, z)
+            dist = abs(x - xc)
+            e = h - dist
+            # Mínimo suave con el pie: el lóbulo se cierra redondo abajo.
+            e = -canto * math.log(math.exp(-e / canto) + math.exp(-ez / canto))
+            borde = 0.5 * (1.0 + math.tanh(1.6 * e / canto))
+            almohada = 1.0 - 0.25 * min(1.0, dist / max(h, 1e-6)) ** 2
+            mejor = max(mejor, borde * almohada)
+        return a * mejor
+    deriva = 2.0 * (gordura * h0 + vaiven * pr) / perimetro
+    return Acabado(fn, a, periodos_s=n, periodos_z=2, deriva_s=deriva, hunde=0.0)
+
 ACABADOS = {
     "liso": ("Liso", liso),
     "ondulado": ("Ondulado", ondulado),
@@ -341,4 +406,5 @@ ACABADOS = {
     "espiga": ("Espiga", espiga),
     "lino": ("Lino", lino),
     "martillado": ("Martillado", martillado),
+    "meandro": ("Meandro (lóbulos alternados)", meandro),
 }

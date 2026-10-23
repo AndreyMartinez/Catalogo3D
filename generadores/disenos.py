@@ -127,7 +127,7 @@ PARAMETROS = [
     num("onda_amplitud", "Relieve", 0.5, 0.0, 3.0, 0.1, "mm", "Acabado",
         depende=["ondulado", "canal", "facetado", "torsion", "torsion_lado",
                  "escalonado", "rombo", "junco", "espiga", "lino",
-                 "martillado"],
+                 "martillado", "meandro"],
         ayuda="Cuánto sobresale la estría. Como el valle se mete lo mismo que "
               "sube la cresta, el motor lo topa en pared − 0.8 mm: por debajo "
               "de eso el laminador no mete dos hilos en el valle y la pieza "
@@ -156,11 +156,28 @@ PARAMETROS = [
               "corto —4 a 6 mm— o los hilos se separan y deja de ser tela."),
     num("torsion_vueltas", "Vueltas de torsión", 0.15, -1.0, 1.0, 0.05, "",
         "Acabado", depende=["torsion", "torsion_lado"]),
+    num("meandro_paso", "Paso del lóbulo (lóbulo + surco)", 60.0, 20.0, 120.0,
+        1.0, "mm", "Acabado", depende=["meandro"]),
+    num("meandro_surco", "Ancho del surco", 0.30, 0.05, 0.80, 0.05, "×",
+        "Acabado", depende=["meandro"],
+        ayuda="Qué parte del paso es surco. Bajo, los lóbulos casi se tocan."),
+    num("meandro_cintura", "Bulbo del lóbulo", 0.35, 0.0, 0.7, 0.05, "",
+        "Acabado", depende=["meandro"],
+        ayuda="Cuánto engorda el bulbo y se angosta el cuello. Un lóbulo lleva "
+              "el bulbo arriba y su vecino abajo; en 0 son franjas rectas."),
+    num("meandro_vaiven", "Vaivén de lado", 0.0, 0.0, 0.25, 0.01, "×",
+        "Acabado", depende=["meandro"],
+        ayuda="Corre los lóbulos de lado al subir, uno hacia cada lado."),
+    num("meandro_canto", "Redondez del canto", 4.0, 0.5, 12.0, 0.5, "mm",
+        "Acabado", depende=["meandro"]),
+    num("meandro_pie", "Pie liso", 6.0, 0.0, 30.0, 1.0, "mm", "Acabado",
+        depende=["meandro"],
+        ayuda="Milímetros lisos sobre la base, donde el lóbulo se cierra."),
     num("acabado_desvanece", "Alisa hacia la boca", 0.0, 0.0, 40.0, 1.0, "mm",
         "Acabado",
         depende=["ondulado", "canal", "facetado", "torsion", "torsion_lado",
                  "escalonado", "rombo", "junco", "espiga", "lino",
-                 "martillado"],
+                 "martillado", "meandro"],
         ayuda="Cuántos milímetros, medidos desde la boca hacia abajo, se "
               "alisan sin importar el acabado elegido. En 0 el relieve llega "
               "hasta el labio y puede dejarlo mordido, sobre todo con "
@@ -171,7 +188,7 @@ PARAMETROS = [
         "Acabado",
         depende=["ondulado", "canal", "facetado", "torsion", "torsion_lado",
                  "escalonado", "rombo", "junco", "espiga", "lino",
-                 "martillado"],
+                 "martillado", "meandro"],
         ayuda="Con «Alisa hacia la boca», a dónde se lleva el relieve. En 0 "
               "se alisa a la pared nominal; en 1 sube a ras de las crestas y "
               "los surcos terminan contra un aro liso en la boca."),
@@ -425,6 +442,26 @@ DISENOS = [
             "divisor_grosor": 2.0, "divisor_alto": 75, "divisor_forma": "ola",
             "divisor_ola": 3.0, "drenaje_diametro": 0.0, "base_redondeo": 6,
             "grano": 0.6, "segmentos": 600,
+        },
+    },
+    {
+        # La pieza de la foto del 2026-10-22: óvalo en barrilito con lóbulos
+        # abultados que se alternan —bulbo arriba, el vecino bulbo abajo— y
+        # tres compartimentos con divisores hasta la boca. v1 aprobada en
+        # precheck (ver .claude/optimizaciones/portacubiertos-meandro.md).
+        "clave": "portacubiertos_meandro",
+        "nombre": "Portacubiertos Meandro",
+        "descripcion": "Óvalo en barril con lóbulos alternados, tres compartimentos.",
+        "carpeta": "portacubiertos",
+        "valores": {
+            "contorno": "superelipse", "ancho": 188, "fondo": 88, "alto": 112,
+            "redondeo": 34, "perfil": "barril", "perfil_intensidad": 0.07,
+            "acabado": "meandro", "onda_amplitud": 4.2, "meandro_paso": 52,
+            "meandro_surco": 0.32, "meandro_cintura": 0.45,
+            "meandro_canto": 4.5, "meandro_pie": 7, "pared": 1.8, "piso": 1.4,
+            "ranuras": 3, "divisor_grosor": 2.4, "divisor_alto": 112,
+            "divisor_forma": "ola", "divisor_ola": 3, "drenaje_diametro": 0.0,
+            "base_redondeo": 8, "grano": 0.7, "segmentos": 480,
         },
     },
     {
