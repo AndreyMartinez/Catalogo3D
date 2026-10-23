@@ -91,11 +91,34 @@ Juego completo (3 vasos + bandeja, un plato P2S), costo = g × 167 $/kg + paquet
 | v7 (perfil embebido, sin cambios) | 10 h 33 | 288.4 g | $64.53 |
 | **v8** | **9 h 31** | **278.5 g** | **$62.89** |
 
+## v9 (10-23) — costillas con relleno ligero
+Pedido: «Puedes bajar el costo esta un poco alto». Forma sin cambios. Respaldo: `.v8.bak`.
+
+Cada costilla (cáscara de 2.4 mm) tiene por dentro menos de 15 mm² y el laminador la
+llenaba de relleno **sólido** (morado en la capa). Con `minimum_sparse_infill_area` = 0
+por objeto en los vasos lleva relleno ligero entre sus dos paredes.
+
+Vaso solo (CLI): v8 54.5 g · 2 h 29 → **49.3 g · 2 h 03**. Probadas también: 1 pared
+42.9 g · 1 h 54; 1 pared + área 0: 37.4 g · 1 h 50 (piel de 0.45 mm, frágil); área 0 +
+relleno 10 %: 47.5 g · 2 h 00.
+
+Juego completo (CLI), costo = g × 167 $/kg + $16.38:
+
+| Opción | Tiempo | Peso | Costo |
+|---|---|---|---|
+| v8 | 9 h 31 | 278.5 g | $62.89 |
+| **v9 — A: costillas con relleno (elegida)** | **8 h 14** | **263.0 g** | **$60.30** |
+| B: costillas de 1 pared | 7 h 36 | 227.2 g | $54.32 |
+| C: B + bandeja lightning | 7 h 11 | 200.2 g | $49.82 |
+
+La paquetería ($16.38, con maceta de regalo y tierra) es el 27 % del costo; no se tocó.
+Si al imprimir la v9 aguanta bien, B queda como siguiente paso (probar uno antes de vender).
+
 ## Pendiente / conocido
 - **Imprimir** el juego y revisar las costillas (sin z-hop se ahorrarían 17 min por vaso,
   51 por juego, pero la boquilla podría raspar las costillas: no se aplicó).
-- **Vaso** 54.5 g laminado (la suma de sólidos del script da 60.8, sobreestima).
-- El tiempo lo mandan los vasos (3 × 2 h 29 de 9 h 31): 7 070 s de relleno sólido
-  dentro de la cáscara de 2.4 mm y 9 000 s de trayectos entre costillas.
+- **Vaso** 49.3 g laminado (la suma de sólidos del script da 60.8, sobreestima).
+- El tiempo lo mandan los vasos (3 × 2 h 03 de 8 h 14), sobre todo los trayectos entre
+  costillas.
 - Rendijas de 2.2 mm: la punta de cuchillos o tenedores podría atorarse; el usuario
   eligió dejarlas así.

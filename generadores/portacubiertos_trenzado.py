@@ -341,7 +341,14 @@ DE_FABRICA = {"sparse_infill_density", "skeleton_infill_density",
 # de 4.5 mm. Al 10 % pesa 115 g en vez de 125 y tarda 11 min menos. Hacer
 # huecas las cinturas por dentro salió peor (133 g, +22 min): el relleno ya
 # las dejaba huecas y la cavidad suma paredes.
-POR_OBJETO = {"bandeja": {"sparse_infill_density": "10%"}}
+#
+# Las costillas del vaso (cáscara de 2.4 mm) tienen por dentro menos de 15 mm²
+# y el laminador las llenaba de relleno sólido. Con el área mínima en 0 llevan
+# relleno ligero entre sus dos paredes: 54.5 → 49.3 g y 2 h 29 → 2 h 03 por
+# vaso, sin cambiar la forma. Con una sola pared bajaba a 37.4 g, pero la piel
+# de la costilla queda de 0.45 mm: se descartó por frágil.
+POR_OBJETO = {"bandeja": {"sparse_infill_density": "10%"},
+              "vaso": {"minimum_sparse_infill_area": "0"}}
 
 
 def modelo_settings(modelo):
