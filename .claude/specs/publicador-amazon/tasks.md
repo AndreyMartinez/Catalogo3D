@@ -13,7 +13,7 @@ Todo vive en `.claude/skills/publicar-amazon/`. Las pruebas sin red van en
 `colecta-full/scripts/prueba_traer_datos.py`) y crecen con cada tarea.
 
 - [ ] 1. Esqueleto del skill y cliente de SP-API
-  - [ ] 1.1 `sp_api.py`: credenciales y candados
+  - [x] 1.1 `sp_api.py`: credenciales y candados
     - `cargar_credenciales()` con los mensajes del Req. 1.3, el rechazo de
       permisos ≠ 600 (Req. 1.4) y `_tapar()` para quitar secretos de
       cualquier texto (Req. 1.5).
