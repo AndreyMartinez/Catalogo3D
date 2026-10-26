@@ -119,8 +119,22 @@ Parámetros que cambian respecto de la v2:
 `{"ancho": 184, "fondo": 66.5, "redondeo": 30, "alto": 102, "perfil_intensidad": 0.055,
 "ranuras": 3, "filas": 1, "divisor_alto": 100}`.
 
+## 2026-10-25 (v4, ajuste del usuario en Bambu) — medidas en MercadoLibre
+El usuario escaló la v3 a mano en Bambu Studio (sin regenerar): x 0.9164, y 1.0391,
+z 0.8785, 2 piezas por plato. Por fuera queda **179.2 × 81.1 × 89.6 mm** (antes
+195.5 × 78 × 102). Al escalar en Bambu también se escalan pared, piso y divisores (la pared
+de 1.95 queda ~1.8 de frente y ~2.0 de fondo): ya no coincide con la receta rápida
+de 1.95. No hay `.v3.bak` (el archivo se sobrescribió desde Bambu); la v3 se reconstruye
+con los parámetros de arriba.
+
+Publicación **MLM3674350731** «Organizador De Cubiertos Olas Más Obsequios Negro»
+($209, flex/xd_drop_off): Ancho 8 → **17.9 cm**, Profundidad 8 → **8.1 cm**, Altura 10 →
+**9 cm** por API (PUT 200, verificado). El ancho de 8 cm era un error previo de la ficha.
+Paquete sin cambio (20 × 16 × 11, 198 g).
+
 ## Pendiente / conocido y no resuelto
-- Imprimir la v3: confirmar que la pared sale maciza en los valles (no dos
+- Laminar la v4 (tiempo, peso, costo) y anotarla en la tabla.
+- Imprimir la v4: confirmar que la pared sale maciza en los valles (no dos
   cáscaras), que el voladizo de 46.5° bajo la panza de arriba no se cae, que la
   estría se ve como en la foto y que los cubiertos caben en los compartimentos
   angostos (~55 mm en la cintura).
