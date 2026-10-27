@@ -90,7 +90,9 @@ idéntica al .3mf de la v2.
 | — | 1.95 | 2.0 | 2.0 × 88 | no | rápida | 3 h 33 m | 154.3 g | $42.14 |
 | — | 1.95 | 1.2 | 2.0 × 88 | no | rápida | 3 h 19 m | 145.9 g | $40.75 |
 | v2 (2/plato) | 1.95 | 1.2 | 2.0 × 75 | no | rápida | 3 h 19 m | 140.8 g | $39.89 |
-| **v3** (3/plato, 195.5×78×102, 3 compartimentos) | 1.95 | 1.2 | 2.0 × 100 | no | rápida | **2 h 34 m** | **105.1 g** | **$33.93** |
+| v3 (3/plato, 195.5×78×102, 3 compartimentos) | 1.95 | 1.2 | 2.0 × 100 | no | rápida | 2 h 34 m | 105.1 g | $33.93 |
+| v4 (2/plato, escalada en Bambu ×0.916/×1.039/×0.879 → 179.2×81.1×89.6) | 1.79–2.03 | 1.05 | 2.0 × 87.9 | no | rápida | 2 h 20 m | 89.9 g | $31.39 |
+| **v5** (3/plato, regenerada 179.3×81.1×89.6) | 1.95 | 1.2 | 2.0 × 87.6 | no | rápida | **2 h 20 m** | **93.7 g** | **$32.02** |
 
 Perfil rápido (en `project_settings.config` y en `different_settings_to_system`):
 `wall_loops` 1, `wall_generator` arachne, `outer/inner_wall_line_width` 0.62,
@@ -132,14 +134,33 @@ Publicación **MLM3674350731** «Organizador De Cubiertos Olas Más Obsequios Ne
 **9 cm** por API (PUT 200, verificado). El ancho de 8 cm era un error previo de la ficha.
 Paquete sin cambio (20 × 16 × 11, 198 g).
 
+Medido el 10-26: el escalado disparejo dejó la pared en 1.79 (puntas) – 2.03
+(frente) y el voladizo en **50.3°** (p99.9 por área; 256 mm² arriba de 45°, la v3
+tenía 75 mm²). CLI: placa de 2 en 4 h 39 m / 179.8 g. Respaldo: `.3mf.v4.bak` y
+`.png.v4.bak`.
+
+## 2026-10-26 (v5) — «optimizar y ver si llegan a caber 3»
+Regenerada con el generador a la medida exterior de la v4 (las medidas de ML no
+cambian). Cambios respecto de la v3: `ancho` 184 → 169.4, `fondo` 66.5 → 71.2,
+`alto` 102 → 89.6, `divisor_alto` 100 → 87.6, `perfil_intensidad` 0.055 → 0.050
+(0.055 daba 47.3° y aviso de soporte; 0.045 daba 41.6° pero panzas más tenues).
+Pared 1.95 pareja, voladizo **44.8°** (39 mm² arriba de 45°).
+Plato: silueta 179.3×81.05 (97.6 % convexa: encimar no ahorra); 3 en fila con
+5 mm entre panzas y 1.4 mm al borde; en la primera capa la huella es 4.85 mm más
+angosta por lado → 14.7 mm entre bases y 6.3 al borde. Sin borde en el laminado.
+CLI: **3 piezas en 6 h 59 m / 281.0 g** (v4: 2 en 4 h 39 m / 179.8 g). Por pieza el
+tiempo queda igual (2 h 20 m) y +3.8 g (+$0.63) por la pared pareja; la ganancia es
+una corrida de 3 en vez de 2 (un cambio de placa menos cada 3 piezas).
+Miniatura y `.stl` del catálogo regenerados.
+
 ## Pendiente / conocido y no resuelto
-- Laminar la v4 (tiempo, peso, costo) y anotarla en la tabla.
-- Imprimir la v4: confirmar que la pared sale maciza en los valles (no dos
-  cáscaras), que el voladizo de 46.5° bajo la panza de arriba no se cae, que la
+- Imprimir la v5: confirmar que la pared sale maciza en los valles (no dos
+  cáscaras), que el voladizo de 44.8° bajo la panza de arriba no se cae, que la
   estría se ve como en la foto y que los cubiertos caben en los compartimentos
   angostos (~55 mm en la cintura).
-- La receta `portacubiertos_oleaje_m` del motor es la v2; si la v3 se queda,
-  actualizarla.
+- La receta `portacubiertos_oleaje_m` del motor es la v2; si la v5 se queda,
+  actualizarla (y el snapshot `RECETAS` de `pruebas.py`).
+- `crear.py --help` truena con `KeyError: 'opciones'` (bug del listado de parámetros).
 - Lo que queda de tiempo es pared exterior (5.9 h de las 7.6 h de la placa), frenada
   por el tope de 21 mm³/s del filamento. No se subió.
 - Si hace falta rascar peso: divisores 2.0 → 1.6 mm (~−8 g, va contra lo que pidió
