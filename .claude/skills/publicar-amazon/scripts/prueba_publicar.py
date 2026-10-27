@@ -301,5 +301,100 @@ class CacheDeEsquema(unittest.TestCase):
         self.assertFalse((esquema.CARPETA / "CADDY.json").exists())
 
 
+def _texto(valor):
+    return [{"value": valor, "language_tag": "es_MX", "marketplace_id": "A1AM78C64UM0Y8"}]
+
+
+ESQUEMA_REVISION = {"tipo": "CADDY", "esquema": {
+    "required": ["brand", "item_name", "country_of_origin"],
+    "additionalProperties": False,
+    "properties": {
+        "brand": {"items": {"required": ["language_tag", "value"], "properties": {
+            "value": {"type": "string", "minLength": 1, "maxLength": 100}}}},
+        "item_name": {"items": {"required": ["language_tag", "value"], "properties": {
+            "value": {"type": "string", "maxLength": 200}}}},
+        "generic_keyword": {"items": {"properties": {
+            "value": {"type": "string", "maxUtf8ByteLength": 10}}}},
+        "country_of_origin": {"items": {"required": ["value"], "properties": {
+            "value": {"type": "string", "enum": ["MX", "US"],
+                      "enumNames": ["México", "Estados Unidos"]}}}},
+        "material": {"items": {"properties": {"value": {"type": "string", "anyOf": [
+            {"type": "string"},
+            {"type": "string", "enum": ["PLA", "Plástico", "Acero al carbono", "Acero inoxidable"],
+             "enumNames": ["PLA", "Plástico", "Acero al carbono", "Acero inoxidable"]}]}}}},
+        "supplier_declared_has_product_identifier_exemption": {"items": {"properties": {
+            "value": {"type": "boolean", "enum": [False, True]}}}},
+    }}}
+
+
+class Revision(unittest.TestCase):
+
+    def base(self):
+        return {"brand": _texto("Generic"), "item_name": _texto("Organizador"),
+                "country_of_origin": [{"value": "MX"}]}
+
+    def errores(self, atributos):
+        return [(h["campo"], h["detalle"]) for h in esquema.revisar(atributos, ESQUEMA_REVISION)
+                if h["tipo"] == "error"]
+
+    def test_limpio(self):
+        self.assertEqual(esquema.revisar(self.base(), ESQUEMA_REVISION), [])
+
+    def test_obligatorio_faltante(self):
+        a = self.base()
+        del a["brand"]
+        a["item_name"] = []
+        campos = [c for c, _ in self.errores(a)]
+        self.assertEqual(sorted(campos), ["brand", "item_name"])
+
+    def test_titulo_de_201(self):
+        a = dict(self.base(), item_name=_texto("x" * 201))
+        self.assertEqual(self.errores(a), [("item_name", "201 caracteres; el máximo es 200")])
+
+    def test_bytes_cuentan_acentos(self):
+        a = dict(self.base(), generic_keyword=_texto("ñañaña"))   # 6 letras, 9 bytes
+        self.assertEqual(self.errores(a), [])
+        a = dict(self.base(), generic_keyword=_texto("ñañañaña"))  # 12 bytes
+        self.assertIn("12 bytes", self.errores(a)[0][1])
+
+    def test_fuera_de_lista_cerrada_es_error(self):
+        a = dict(self.base(), country_of_origin=[{"value": "México"}])
+        self.assertIn("no está en la lista", self.errores(a)[0][1])
+
+    def test_fuera_de_lista_sugerida_es_aviso(self):
+        a = dict(self.base(), material=_texto("Madera"))
+        h = esquema.revisar(a, ESQUEMA_REVISION)
+        self.assertEqual([x["tipo"] for x in h], ["aviso"])
+
+    def test_atributo_que_el_tipo_no_tiene(self):
+        a = dict(self.base(), capacity=[{"value": 2.5, "unit": "liters"}])
+        self.assertEqual(self.errores(a), [("capacity", "el tipo CADDY no tiene este atributo")])
+
+    def test_subcampo_requerido(self):
+        a = dict(self.base(), brand=[{"value": "Generic"}])
+        self.assertEqual(self.errores(a), [("brand", "le falta language_tag")])
+
+    def test_mas_cercano(self):
+        valores, nombres, cerrada = esquema.opciones(ESQUEMA_REVISION, "material")
+        self.assertFalse(cerrada)
+        self.assertEqual(esquema.valor_mas_cercano("PLA", valores, nombres), "PLA")
+        self.assertEqual(esquema.valor_mas_cercano("plastico", valores, nombres), "Plástico")
+        self.assertIsNone(esquema.valor_mas_cercano("acero", valores, nombres))   # ambiguo
+        self.assertIsNone(esquema.valor_mas_cercano("Madera", valores, nombres))
+        v, n, cerrada = esquema.opciones(ESQUEMA_REVISION, "country_of_origin")
+        self.assertTrue(cerrada)
+        self.assertEqual(esquema.valor_mas_cercano("México", v, n), "MX")
+
+    def test_palabra_completa(self):
+        # «pla» no debe caer en «Plástico» por empezar igual.
+        self.assertIsNone(esquema.valor_mas_cercano("pla", ["Plástico", "Vidrio"]))
+        self.assertEqual(esquema.valor_mas_cercano("carbono", ["Acero al carbono", "Vidrio"]),
+                         "Acero al carbono")
+
+    def test_exencion(self):
+        self.assertEqual(esquema.atributo_exencion(ESQUEMA_REVISION),
+                         "supplier_declared_has_product_identifier_exemption")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -34,7 +34,7 @@ Todo vive en `.claude/skills/publicar-amazon/`. Las pruebas sin red van en
       (`5Z-W3LH-N087`).
     - _Requisitos: 1.1, 1.2, 1.6, 8.5_
 
-- [ ] 2. Esquema de Amazon (`esquema.py`)
+- [x] 2. Esquema de Amazon (`esquema.py`)
   - [x] 2.1 Buscar tipo y cachear esquema
     - `buscar_tipos()`, `esquema(tipo)` con caché por
       `productTypeVersion` en `~/.catalogo3d/amazon/esquemas/` (carpeta
@@ -44,7 +44,7 @@ Todo vive en `.claude/skills/publicar-amazon/`. Las pruebas sin red van en
       (`brand`, `bullet_point`, `country_of_origin`, `item_name`,
       `product_description`, `supplier_declared_dg_hz_regulation`).
     - _Requisitos: 5.1, 5.3, 5.5_
-  - [ ] 2.2 `revisar()`, `valor_mas_cercano()` y `atributo_exencion()`
+  - [x] 2.2 `revisar()`, `valor_mas_cercano()` y `atributo_exencion()`
     - Puras, sobre el esquema.
     - Prueba con un esquema mínimo escrito en la prueba: obligatorio
       faltante, `item_name` de 201 caracteres, valor fuera de enum; «PLA»

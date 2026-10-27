@@ -11,7 +11,9 @@ import base64
 import hashlib
 import json
 import os
+import re
 import sys
+import unicodedata
 import urllib.error
 import urllib.request
 from datetime import datetime, timezone
@@ -109,3 +111,131 @@ def obligatorios(cache):
     """Los atributos que el esquema exige siempre (los condicionales los
     revisa Amazon al validar)."""
     return list(cache["esquema"].get("required") or [])
+
+
+# ------------------------------------------------------- revisión local
+
+def _sin_acentos(texto):
+    descompuesto = unicodedata.normalize("NFD", str(texto).lower())
+    return " ".join("".join(c for c in descompuesto
+                            if unicodedata.category(c) != "Mn").split())
+
+
+def opciones(cache, atributo):
+    """Lista de valores del atributo: (valores, nombres, cerrada). 'cerrada'
+    es un enum (solo vale lo de la lista); si no, es una lista sugerida
+    (anyOf con texto libre). Sin lista: ([], [], False)."""
+    valor = _valor(_propiedad(cache, atributo))
+    if "enum" in valor:
+        return valor["enum"], valor.get("enumNames") or valor["enum"], True
+    for opcion in valor.get("anyOf") or []:
+        if "enum" in opcion:
+            return opcion["enum"], opcion.get("enumNames") or opcion["enum"], False
+    return [], [], False
+
+
+def valor_mas_cercano(texto, valores, nombres=None):
+    """El valor de la lista que corresponde a un dato de ML. Primero igualdad
+    (con el valor o con su nombre visible), luego el texto como palabra
+    completa dentro del nombre. Si no hay uno solo, None: el campo queda
+    «por revisar»."""
+    if texto is None or not valores:
+        return None
+    nombres = nombres or valores
+    buscado = _sin_acentos(texto)
+    if not buscado:
+        return None
+    pares = list(zip(valores, nombres))
+    iguales = [v for v, n in pares
+               if buscado in (_sin_acentos(v), _sin_acentos(n))]
+    if len(set(map(str, iguales))) == 1:
+        return iguales[0]
+    if iguales:
+        return None
+    patron = re.compile(r"\b" + re.escape(buscado) + r"\b")
+    contienen = [v for v, n in pares if patron.search(_sin_acentos(n))]
+    return contienen[0] if len(contienen) == 1 else None
+
+
+def atributo_exencion(cache):
+    """Nombre del atributo con el que se declara que el producto no tiene
+    GTIN (supplier_declared_has_product_identifier_exemption en CADDY)."""
+    for nombre in cache["esquema"].get("properties") or {}:
+        if "product_identifier_exemption" in nombre:
+            return nombre
+    return None
+
+
+def _propiedad(cache, atributo):
+    return (cache["esquema"].get("properties") or {}).get(atributo) or {}
+
+
+def _valor(propiedad):
+    return ((propiedad.get("items") or {}).get("properties") or {}).get("value") or {}
+
+
+def _hallazgo(campo, tipo, detalle):
+    return {"campo": campo, "tipo": tipo, "detalle": detalle}
+
+
+def revisar(atributos, cache):
+    """Revisa los atributos ya en forma de Amazon (los del payload) contra el
+    esquema, sin red. Devuelve [{campo, tipo: 'error'|'aviso', detalle}].
+    Las reglas condicionales (allOf/if/then) no se reimplementan: esas las
+    reporta Amazon en la vista previa."""
+    esq = cache["esquema"]
+    props = esq.get("properties") or {}
+    hallazgos = []
+
+    for campo in esq.get("required") or []:
+        if not atributos.get(campo):
+            hallazgos.append(_hallazgo(campo, "error", "obligatorio y sin valor"))
+
+    for campo, lista in atributos.items():
+        prop = props.get(campo)
+        if prop is None:
+            tipo = "error" if esq.get("additionalProperties") is False else "aviso"
+            hallazgos.append(_hallazgo(campo, tipo,
+                                       f"el tipo {cache.get('tipo', '')} no tiene este atributo"))
+            continue
+        if not isinstance(lista, list):
+            hallazgos.append(_hallazgo(campo, "error", "debe ser una lista de valores"))
+            continue
+        if prop.get("maxItems") and len(lista) > prop["maxItems"]:
+            hallazgos.append(_hallazgo(campo, "error",
+                                       f"{len(lista)} valores; el máximo es {prop['maxItems']}"))
+        requeridos = (prop.get("items") or {}).get("required") or []
+        regla = _valor(prop)
+        valores, nombres, cerrada = opciones(cache, campo)
+        for i, entrada in enumerate(lista, 1):
+            donde = f"{campo}[{i}]" if len(lista) > 1 else campo
+            if not isinstance(entrada, dict):
+                hallazgos.append(_hallazgo(donde, "error", "cada valor debe ser un objeto"))
+                continue
+            faltan = [r for r in requeridos if r not in entrada]
+            if faltan:
+                hallazgos.append(_hallazgo(donde, "error", f"le falta {', '.join(faltan)}"))
+            if "value" not in entrada:
+                continue
+            valor = entrada["value"]
+            if isinstance(valor, str):
+                largo = len(valor)
+                if regla.get("maxLength") is not None and largo > regla["maxLength"]:
+                    hallazgos.append(_hallazgo(donde, "error",
+                                               f"{largo} caracteres; el máximo es {regla['maxLength']}"))
+                if regla.get("minLength") and largo < regla["minLength"]:
+                    hallazgos.append(_hallazgo(donde, "error", "vacío"))
+                bytes_ = len(valor.encode("utf-8"))
+                tope = regla.get("maxUtf8ByteLength")
+                if tope is not None and bytes_ > tope:
+                    hallazgos.append(_hallazgo(donde, "error",
+                                               f"{bytes_} bytes; el máximo es {tope}"))
+            if valores and valor not in valores:
+                if cerrada:
+                    hallazgos.append(_hallazgo(donde, "error",
+                                               f"«{valor}» no está en la lista de Amazon"))
+                else:
+                    hallazgos.append(_hallazgo(donde, "aviso",
+                                               f"«{valor}» no está en la lista sugerida; "
+                                               "Amazon lo acepta, pero filtra mejor con uno de la lista"))
+    return hallazgos

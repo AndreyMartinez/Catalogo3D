@@ -160,14 +160,18 @@ flowchart LR
   corrida). Si su `productTypeVersion.version` coincide con la de
   `~/.catalogo3d/amazon/esquemas/<tipo>.json`, usa la caché; si no, baja
   `schema.link.resource` y la reemplaza (Req. 5.5).
-- `revisar(borrador, esquema)` → lista de hallazgos `{campo, tipo, detalle}`,
-  sin red:
+- `revisar(atributos, esquema)` → lista de hallazgos `{campo, tipo, detalle}`,
+  sin red. Recibe los atributos ya en forma de Amazon (los de `payload()`),
+  así revisa exactamente lo que se mandaría; con el Olas real da 0 errores:
   - obligatorios del `required` raíz sin valor (Req. 5.3). Las reglas
     condicionales (`allOf/if/then`) no se reimplementan: las reporta Amazon
     en la validación;
   - `maxLength` / `maxItems` / `minLength` de `properties.<attr>.items.properties.value`
     (Req. 4.2);
-  - valores fuera de `enum` (Req. 5.4).
+  - valores fuera de `enum` (Req. 5.4): error si la lista es cerrada
+    (`enum`), aviso si es sugerida (`anyOf` con texto libre);
+  - atributos que el tipo no tiene (`additionalProperties: false`) y
+    subcampos requeridos (`language_tag`, `unit`…).
 - `valor_mas_cercano(texto, enum, enumNames)`: normaliza (minúsculas, sin
   acentos) y busca primero igualdad y luego contención en un solo sentido.
   Si hay 0 o 2+ candidatos, devuelve `None` y el campo queda «por revisar».
