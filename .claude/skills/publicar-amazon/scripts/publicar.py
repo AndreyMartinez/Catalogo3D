@@ -503,6 +503,116 @@ def cmd_estado(args):
     return 0
 
 
+# -------------------------------------------------------------- publicar
+
+def _confirmado(args, sku_):
+    """True si el SKU se confirmó con --confirmo (o tecleado en una terminal
+    interactiva). Un --confirmo con otro SKU es error, no un «no»."""
+    if args.confirmo is not None:
+        if args.confirmo != sku_:
+            raise ErrorPublicador(f"--confirmo {args.confirmo} no es el SKU de esta publicación "
+                                  f"({sku_}). No se mandó nada.")
+        return True
+    if sys.stdin.isatty():
+        return input(f"Escribe el SKU para publicar ({sku_}): ").strip() == sku_
+    return False
+
+
+def _registrar(clave, br, respuesta, precio_):
+    registro = {"mlm": br["mlm"], "variacion": br.get("variacion"), "asin": None,
+                "fecha": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                "precio": precio_, "submission_id": respuesta.get("submissionId")}
+    for ident in respuesta.get("identifiers") or []:
+        for i in ident.get("identifiers") or []:
+            if i.get("identifierType") == "ASIN":
+                registro["asin"] = i.get("identifier")
+    pub = publicadas()
+    pub[br["sku"]] = {**pub.get(br["sku"], {}), **registro}
+    guardar_privado(PUBLICADAS, pub)
+    br["publicado"] = registro
+    guardar_privado(ruta_borrador(clave), br)
+
+
+def cmd_publicar(args):
+    clave = args.clave.upper()
+    br = leer_borrador(clave)
+    sku_ = br["sku"]
+    if args.confirmo is not None and args.confirmo != sku_:
+        raise ErrorPublicador(f"--confirmo {args.confirmo} no es el SKU de {clave} ({sku_}). "
+                              "No se mandó nada.")
+    campos = [c.strip() for c in (args.campos or "").split(",") if c.strip()]
+
+    if not campos:
+        # Publicación completa: los candados del Req. 9.1, antes de tocar la red.
+        if borrador.estado(br) == "publicado":
+            raise ErrorPublicador(f"{clave} ya está publicado como {sku_}. Para cambiar campos "
+                                  "usa --campos.")
+        if borrador.estado(br) != "validado":
+            raise ErrorPublicador(f"{clave} no está validado con su contenido actual. "
+                                  f"Corre antes: validar {clave}")
+        if br.get("por_revisar"):
+            raise ErrorPublicador(f"{clave} tiene campos por revisar: {', '.join(br['por_revisar'])}. "
+                                  f"Revísalos y apruébalos con: aprobar {clave} <campo>…")
+
+    cache = esquema.esquema(br["tipo_producto"])
+    cuerpo = borrador.payload(br, cache)
+    actual = leer_listing(sku_)
+
+    if actual is None:
+        if campos:
+            raise ErrorPublicador(f"{sku_} no existe en Amazon: --campos es para cambiar una "
+                                  "publicación que ya existe.")
+        e = br.get("envio") or {}
+        print(f"\nPublicar en Amazon México:\n  SKU      {sku_}\n  título   {br['titulo']}\n"
+              f"  precio   ${br['precio']}\n  envío    {e.get('modo')}"
+              + (f", {e['cantidad']} piezas" if e.get("cantidad") else "")
+              + f"\n  foto     {br['fotos']['principal']}\n  tipo     {br['tipo_producto']}")
+        if not _confirmado(args, sku_):
+            print(f"\nNo se publicó. Para publicar: publicar {clave} --confirmo {sku_}")
+            return 0
+        r = sp_api.pedir("PUT", _ruta_sku(sku_), {
+            "marketplaceIds": [sp_api.MARKETPLACE], "includedData": ["issues", "identifiers"],
+            "issueLocale": sp_api.LOCALE}, cuerpo)
+        print(f"\nAmazon respondió: {r.get('status')}")
+        imprimir_issues(r.get("issues") or [])
+        if r.get("status") == "ACCEPTED":
+            _registrar(clave, br, r, br.get("precio"))
+            print(f"Registrado en {PUBLICADAS.name}. El ASIN llega en unos minutos: estado {clave}")
+            return 0
+        return 1
+
+    # El SKU ya existe: no se reemplaza; solo los campos que se pidan.
+    filas = diferencias(actual.get("attributes") or {}, cuerpo["attributes"])
+    print(f"\n{sku_} ya existe en Amazon. {len(filas)} diferencias con el borrador:")
+    for nombre, en_amz, en_br in filas:
+        print(f"  {nombre:40} Amazon: {_corto(_txt(en_amz), 45):45}  borrador: {_corto(_txt(en_br), 45)}")
+    if not campos:
+        print(f"\nNo se cambió nada. Para actualizar campos: publicar {clave} "
+              f"--campos color,item_package_weight --confirmo {sku_}")
+        return 0
+    faltan = [c for c in campos if c not in cuerpo["attributes"]]
+    if faltan:
+        raise ErrorPublicador(f"El borrador no tiene: {', '.join(faltan)}. No se mandó nada.")
+    parche = {"productType": cuerpo["productType"], "patches": [
+        {"op": "replace", "path": f"/attributes/{c}", "value": cuerpo["attributes"][c]}
+        for c in campos]}
+    params = {"marketplaceIds": [sp_api.MARKETPLACE], "includedData": ["issues"],
+              "issueLocale": sp_api.LOCALE}
+    previa = sp_api.pedir("PATCH", _ruta_sku(sku_), dict(params, mode="VALIDATION_PREVIEW"), parche)
+    print(f"\nVista previa del cambio ({', '.join(campos)}): {previa.get('status')}")
+    imprimir_issues(previa.get("issues") or [])
+    if previa.get("status") != "VALID":
+        return 1
+    if not _confirmado(args, sku_):
+        print(f"\nNo se cambió nada. Para aplicarlo: publicar {clave} --campos {','.join(campos)} "
+              f"--confirmo {sku_}")
+        return 0
+    r = sp_api.pedir("PATCH", _ruta_sku(sku_), params, parche)
+    print(f"Amazon respondió: {r.get('status')}")
+    imprimir_issues(r.get("issues") or [])
+    return 0 if r.get("status") == "ACCEPTED" else 1
+
+
 # ------------------------------------------------------------------ main
 
 def parser():
@@ -526,6 +636,12 @@ def parser():
         p = sub.add_parser(nombre, help=ayuda)
         p.add_argument("claves", nargs="+")
         p.set_defaults(fn=fn)
+    p = sub.add_parser("publicar", help="publica de verdad (pide --confirmo SKU)")
+    p.add_argument("clave")
+    p.add_argument("--confirmo", metavar="SKU",
+                   help="el SKU exacto; solo después del «sí» del usuario a esta publicación")
+    p.add_argument("--campos", help="si el SKU ya existe: atributos a actualizar, separados por coma")
+    p.set_defaults(fn=cmd_publicar)
     return ap
 
 

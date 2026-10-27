@@ -285,9 +285,12 @@ flowchart LR
 2. GET del SKU. Si no existe, muestra el resumen (SKU, título, precio,
    envío, foto principal). Sin `--confirmo` se detiene ahí. Con
    `--confirmo` igual al SKU hace PUT sin `mode` (Req. 9.2).
-3. Si el SKU ya existe, muestra la diferencia por atributo. Solo con
-   `--campos` y `--confirmo` manda un PATCH con `op: replace` de esos
-   atributos, primero en `VALIDATION_PREVIEW` y luego de verdad (Req. 9.4).
+3. Si el SKU ya existe, muestra la diferencia por atributo y no lo
+   reemplaza nunca. Con `--campos` manda un PATCH con `op: replace` de esos
+   atributos en `VALIDATION_PREVIEW`; solo si sale `VALID` y hay
+   `--confirmo`, lo manda de verdad (Req. 9.4). El PATCH no exige el
+   borrador entero aprobado: toca solo los campos que el usuario eligió
+   (así se corrigen color y pesos del Olas sin aprobar sus viñetas).
 4. Una publicación por comando: no hay `--todas` en `publicar` (Req. 9.3).
 5. Si la respuesta es `ACCEPTED`, escribe en `publicadas.json` (Req. 9.5).
    El ASIN llega después: `estado` lo completa.

@@ -123,7 +123,7 @@ Todo vive en `.claude/skills/publicar-amazon/`. Las pruebas sin red van en
       6/3 compartimentos, «Obsequios» en el título).
     - _Requisitos: 4.6, 9.5, 10.2_
 
-- [ ] 6. Publicar con `--confirmo`
+- [x] 6. Publicar con `--confirmo`
   - `publicar`: candados del Req. 9.1; resumen y alto sin `--confirmo`;
     PUT si el SKU no existe; si existe, diferencia y PATCH solo de
     `--campos`, primero en `VALIDATION_PREVIEW`; registro en

@@ -983,5 +983,119 @@ class Validar(Comandos):
         self.assertIsNone(filas[0][2])
 
 
+# ------------------------------------------------------ publicar (sin red)
+
+class Publicar(Comandos):
+
+    def setUp(self):
+        super().setUp()
+        self.guardado_sp = (sp_api.pedir, sp_api._cred, esquema.esquema)
+        sp_api._cred = dict(CRED_FALSAS)
+        esquema.esquema = lambda tipo: {"tipo": tipo, "esquema": {"properties": {}}}
+        self.llamadas = []
+        self.existe = None          # atributos del SKU en Amazon, o None
+        self.respuestas = {"PUT": {"status": "ACCEPTED", "submissionId": "s1", "identifiers": [
+            {"identifiers": [{"identifierType": "ASIN", "identifier": "B0PRUEBA01"}]}]},
+            "PATCH": {"status": "VALID"}}
+
+        def pedir(metodo, ruta, params=None, cuerpo=None):
+            self.llamadas.append((metodo, dict(params or {})))
+            if metodo == "GET":
+                if self.existe is None:
+                    raise sp_api.ErrorSP(f"GET {ruta} -> 404: NOT_FOUND")
+                return {"summaries": [{"asin": "B0X"}], "attributes": self.existe}
+            r = dict(self.respuestas[metodo])
+            if metodo == "PATCH" and "mode" not in (params or {}):
+                r["status"] = "ACCEPTED"
+            return r
+        sp_api.pedir = pedir
+
+    def tearDown(self):
+        sp_api.pedir, sp_api._cred, esquema.esquema = self.guardado_sp
+        super().tearDown()
+
+    def escrituras(self):
+        return [m for m, p in self.llamadas if m in ("PUT", "PATCH") and "mode" not in p]
+
+    def listo(self):
+        br = publicar.leer_borrador("MLM3674350731")
+        br["por_revisar"] = []
+        br["envio"] = {"modo": "propio", "cantidad": 5}
+        br["validacion"] = {"status": "VALID", "huella": borrador.huella(br)}
+        publicar.guardar_privado(publicar.ruta_borrador("MLM3674350731"), br)
+        return br
+
+    def test_sin_validar_no_toca_la_red(self):
+        codigo, _ = self.correr("publicar", "MLM3674350731", "--confirmo", "SR-PCUB-OLAS-NEG")
+        self.assertEqual(codigo, 1)
+        self.assertEqual(self.llamadas, [])
+
+    def test_por_revisar_no_toca_la_red(self):
+        br = self.listo()
+        br["por_revisar"] = ["precio"]
+        publicar.guardar_privado(publicar.ruta_borrador("MLM3674350731"), br)
+        codigo, _ = self.correr("publicar", "MLM3674350731", "--confirmo", br["sku"])
+        self.assertEqual((codigo, self.llamadas), (1, []))
+
+    def test_huella_vieja_no_toca_la_red(self):
+        br = self.listo()
+        br["precio"] = 249               # cambió después de validar
+        publicar.guardar_privado(publicar.ruta_borrador("MLM3674350731"), br)
+        codigo, _ = self.correr("publicar", "MLM3674350731", "--confirmo", br["sku"])
+        self.assertEqual((codigo, self.llamadas), (1, []))
+
+    def test_otro_sku_no_toca_la_red(self):
+        self.listo()
+        codigo, _ = self.correr("publicar", "MLM3674350731", "--confirmo", "5Z-W3LH-N087")
+        self.assertEqual((codigo, self.llamadas), (1, []))
+
+    def test_sin_confirmo_solo_muestra(self):
+        self.listo()
+        codigo, texto = self.correr("publicar", "MLM3674350731")
+        self.assertEqual(codigo, 0)
+        self.assertEqual(self.escrituras(), [])
+        self.assertIn("--confirmo SR-PCUB-OLAS-NEG", texto)
+
+    def test_con_confirmo_publica_y_registra(self):
+        self.listo()
+        codigo, texto = self.correr("publicar", "MLM3674350731", "--confirmo", "SR-PCUB-OLAS-NEG")
+        self.assertEqual(codigo, 0)
+        self.assertEqual(self.escrituras(), ["PUT"])
+        reg = publicar.publicadas()["SR-PCUB-OLAS-NEG"]
+        self.assertEqual((reg["mlm"], reg["asin"], reg["submission_id"]),
+                         ("MLM3674350731", "B0PRUEBA01", "s1"))
+        self.assertEqual(borrador.estado(publicar.leer_borrador("MLM3674350731")), "publicado")
+        # Una segunda vez ya no publica.
+        codigo, _ = self.correr("publicar", "MLM3674350731", "--confirmo", "SR-PCUB-OLAS-NEG")
+        self.assertEqual(codigo, 1)
+        self.assertEqual(self.escrituras(), ["PUT"])
+
+    def test_sku_existente_no_se_reemplaza(self):
+        self.listo()
+        self.existe = {"color": [{"value": "Plateado"}]}
+        codigo, texto = self.correr("publicar", "MLM3674350731", "--confirmo", "SR-PCUB-OLAS-NEG")
+        self.assertEqual(codigo, 0)
+        self.assertEqual(self.escrituras(), [])
+        self.assertIn("ya existe", texto)
+
+    def test_campos_vista_previa_y_luego_patch(self):
+        self.existe = {"color": [{"value": "Plateado"}]}
+        codigo, texto = self.correr("publicar", "MLM3674350731", "--campos", "color")
+        self.assertEqual(codigo, 0)
+        self.assertEqual(self.escrituras(), [])
+        self.assertIn(("PATCH", "VALIDATION_PREVIEW"),
+                      [(m, p.get("mode")) for m, p in self.llamadas])
+        codigo, _ = self.correr("publicar", "MLM3674350731", "--campos", "color",
+                                "--confirmo", "SR-PCUB-OLAS-NEG")
+        self.assertEqual((codigo, self.escrituras()), (0, ["PATCH"]))
+
+    def test_campo_que_el_borrador_no_tiene(self):
+        self.existe = {"capacity": [{"value": 2.5}]}
+        codigo, texto = self.correr("publicar", "MLM3674350731", "--campos", "capacity",
+                                    "--confirmo", "SR-PCUB-OLAS-NEG")
+        self.assertEqual(codigo, 1)
+        self.assertEqual(self.escrituras(), [])
+
+
 if __name__ == "__main__":
     unittest.main()
