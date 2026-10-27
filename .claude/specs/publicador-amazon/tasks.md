@@ -135,7 +135,7 @@ Todo vive en `.claude/skills/publicar-amazon/`. Las pruebas sin red van en
     el usuario fuera de este plan.
   - _Requisitos: 9.1, 9.2, 9.3, 9.4, 9.5_
 
-- [ ] 7. `SKILL.md` y `CLAUDE.md`
+- [x] 7. `SKILL.md` y `CLAUDE.md`
   - `SKILL.md` con el flujo `armar → redactar → ver → aprobar → validar →
     publicar`, la regla de no poner `--confirmo` sin el «sí» del usuario
     para esa publicación, y cómo crear `amazon_credenciales.json`.
