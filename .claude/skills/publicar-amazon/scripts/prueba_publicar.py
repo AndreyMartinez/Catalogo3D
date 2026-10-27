@@ -641,6 +641,7 @@ class Armado(unittest.TestCase):
         self.assertEqual(at["model_number"], "5Z-W3LH-N087")
         self.assertEqual((at["number_of_items"], at["batteries_required"]), (1, False))
         self.assertEqual(at["unit_count"]["type"]["value"], "unidad")
+        self.assertEqual((at["number_of_boxes"], at["part_number"]), (1, "5Z-W3LH-N087"))
 
     def test_armar_sin_publicar_y_paquete_pesado(self):
         item = dict(OLAS_ITEM, category_id="MLM455181",

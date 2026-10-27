@@ -521,6 +521,10 @@ def armar(item, texto_descripcion, ctx, variacion=None):
         "unit_count": {"value": 1.0, "type": {"value": "unidad", "language_tag": LOCALE}},
         "included_components": modelo,
         "batteries_required": False,
+        # VASE pide número de cajas y SCULPTURE número de pieza (vista previa
+        # del 2026-10-27); el esquema los deja fuera en los tipos que no los usan.
+        "number_of_boxes": 1,
+        "part_number": sku_,
     })
 
     por_revisar = ["titulo", "vinetas", "descripcion", "palabras_clave", "precio",
