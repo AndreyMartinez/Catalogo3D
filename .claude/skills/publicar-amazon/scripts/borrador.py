@@ -573,3 +573,158 @@ _CAMPOS_PROPIOS = {"item_name", "bullet_point", "product_description", "generic_
                    "externally_assigned_product_identifier", "item_depth_width_height",
                    "item_dimensions", "item_length_width_height", "item_weight",
                    "item_package_dimensions", "item_package_weight"}
+
+
+# ------------------------------------------------- lo que va a Amazon
+
+MARKETPLACE = "A1AM78C64UM0Y8"
+LOCALE = "es_MX"
+MONEDA = "MXN"
+# Campos del borrador que cambian lo que se manda; la huella sale de ellos.
+CAMPOS_CONTENIDO = ("sku", "tipo_producto", "titulo", "vinetas", "descripcion",
+                    "palabras_clave", "atributos", "medidas", "fotos", "precio", "envio")
+
+
+class ErrorBorrador(Exception):
+    pass
+
+
+def _subcampos(cache, atributo):
+    if not cache:
+        return {"value", "marketplace_id", "language_tag"}
+    prop = (cache["esquema"].get("properties") or {}).get(atributo) or {}
+    return set(((prop.get("items") or {}).get("properties") or {}))
+
+
+def _entrada(cache, atributo, valor):
+    """Un valor del borrador en la forma de Amazon: {'value': …} más
+    marketplace_id y language_tag solo si el esquema del atributo los tiene."""
+    sub = _subcampos(cache, atributo)
+    entrada = dict(valor) if isinstance(valor, dict) else {"value": valor}
+    if "marketplace_id" in sub:
+        entrada.setdefault("marketplace_id", MARKETPLACE)
+    if "language_tag" in sub and "value" in entrada and isinstance(entrada["value"], str):
+        entrada.setdefault("language_tag", LOCALE)
+    return entrada
+
+
+def _tiene(cache, atributo):
+    return cache is None or atributo in (cache["esquema"].get("properties") or {})
+
+
+def _cm(valor):
+    return {"unit": "centimeters", "value": valor}
+
+
+def payload(br, cache=None):
+    """Borrador → cuerpo de putListingsItem: {productType, requirements,
+    attributes}. Los atributos que el borrador deja en None (por revisar)
+    no se mandan."""
+    if not br.get("tipo_producto"):
+        raise ErrorBorrador("El borrador no tiene tipo de producto.")
+    attrs = {}
+
+    def poner(nombre, valores):
+        valores = [v for v in (valores if isinstance(valores, list) else [valores])
+                   if v not in (None, "", [])]
+        if valores:
+            attrs[nombre] = [_entrada(cache, nombre, v) for v in valores]
+
+    poner("item_name", br.get("titulo"))
+    poner("bullet_point", list(br.get("vinetas") or []))
+    poner("product_description", br.get("descripcion"))
+    poner("generic_keyword", br.get("palabras_clave"))
+    for nombre, valor in (br.get("atributos") or {}).items():
+        poner(nombre, valor)
+
+    fotos_ = br.get("fotos") or {}
+    excluidas = set(fotos_.get("excluidas") or [])
+    if fotos_.get("principal"):
+        poner("main_product_image_locator", {"media_location": fotos_["principal"]})
+    otras = [u for u in fotos_.get("otras") or [] if u not in excluidas]
+    for i, url in enumerate(otras[:MAX_FOTOS - 1], 1):
+        poner(f"other_product_image_locator_{i}", {"media_location": url})
+
+    if br.get("precio"):
+        oferta = {"currency": MONEDA,
+                  "our_price": [{"schedule": [{"value_with_tax": br["precio"]}]}]}
+        if "audience" in _subcampos(cache, "purchasable_offer"):
+            oferta["audience"] = "ALL"
+        poner("purchasable_offer", oferta)
+        if _tiene(cache, "list_price"):
+            poner("list_price", {"currency": MONEDA, "value_with_tax": br["precio"]})
+
+    envio = br.get("envio") or {}
+    if envio.get("modo") == "FBA":
+        poner("fulfillment_availability", {"fulfillment_channel_code": "AMAZON_NA"})
+    elif envio.get("modo") == "propio":
+        if not envio.get("cantidad"):
+            raise ErrorBorrador("Envío propio sin cantidad: pon cuántas piezas tienes "
+                                "en casa (el stock de Full no cuenta).")
+        poner("fulfillment_availability", {"fulfillment_channel_code": "DEFAULT",
+                                           "quantity": int(envio["cantidad"])})
+    elif envio.get("modo") is not None:
+        raise ErrorBorrador(f"Modo de envío desconocido: {envio['modo']!r} (FBA o propio).")
+
+    med = br.get("medidas") or {}
+    a, p = med.get("articulo") or {}, med.get("paquete") or {}
+    if None not in (a.get("frente_cm"), a.get("fondo_cm"), a.get("alto_cm")):
+        if _tiene(cache, "item_depth_width_height"):
+            poner("item_depth_width_height", {"depth": _cm(a["fondo_cm"]),
+                                              "width": _cm(a["frente_cm"]),
+                                              "height": _cm(a["alto_cm"])})
+        elif _tiene(cache, "item_length_width_height"):
+            poner("item_length_width_height", {"length": _cm(a["frente_cm"]),
+                                               "width": _cm(a["fondo_cm"]),
+                                               "height": _cm(a["alto_cm"])})
+    if a.get("peso_g") and _tiene(cache, "item_weight"):
+        poner("item_weight", {"unit": "grams", "value": a["peso_g"]})
+    if None not in (p.get("largo_cm"), p.get("ancho_cm"), p.get("alto_cm")):
+        poner("item_package_dimensions", {"length": _cm(p["largo_cm"]),
+                                          "width": _cm(p["ancho_cm"]),
+                                          "height": _cm(p["alto_cm"])})
+    if p.get("peso_g"):
+        poner("item_package_weight", {"unit": "grams", "value": p["peso_g"]})
+
+    # Sin GTIN: producto exento con la marca del borrador (Generic, como el Olas).
+    if "externally_assigned_product_identifier" not in attrs:
+        from esquema import atributo_exencion   # evita el ciclo al importar
+        exencion = (atributo_exencion(cache) if cache
+                    else "supplier_declared_has_product_identifier_exemption")
+        if exencion:
+            poner(exencion, True)
+
+    return {"productType": br["tipo_producto"], "requirements": "LISTING",
+            "attributes": attrs}
+
+
+def huella(br):
+    """sha256 del contenido que se manda a Amazon, en JSON canónico. Una
+    validación vale solo para la huella con la que se hizo."""
+    import hashlib
+    import json
+    contenido = {c: br.get(c) for c in CAMPOS_CONTENIDO}
+    texto = json.dumps(contenido, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(texto.encode("utf-8")).hexdigest()
+
+
+def estado(br):
+    """'publicado', 'validado' (la última validación es VALID y es de este
+    contenido) o 'borrador'."""
+    if br.get("publicado"):
+        return "publicado"
+    val = br.get("validacion") or {}
+    if val.get("status") == "VALID" and val.get("huella") == huella(br):
+        return "validado"
+    return "borrador"
+
+
+def cambios_en_ml(br, item, variacion=None):
+    """Lo que cambió en ML desde que se armó el borrador: [(campo, antes,
+    ahora)]. El borrador no se toca; el usuario decide."""
+    origen = br.get("origen_ml") or {}
+    principal, otras, _ = fotos(item, variacion)
+    ahora = {"titulo": item.get("title"), "precio": precio(item, variacion),
+             "fotos": [principal] + otras if principal else []}
+    return [(c, origen.get(c), ahora[c]) for c in ("titulo", "precio", "fotos")
+            if origen.get(c) != ahora[c]]

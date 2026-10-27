@@ -658,5 +658,104 @@ class Armado(unittest.TestCase):
         self.assertNotIn("item_name", br["atributos"])               # lo pone payload()
 
 
+# ------------------------------------------------ payload, huella, estado
+
+class Payload(unittest.TestCase):
+
+    def setUp(self):
+        self.br = borrador.armar(OLAS_ITEM, OLAS_DESCRIPCION, {"categorias": CATEGORIAS})
+
+    def test_obligatorios_de_caddy(self):
+        p = borrador.payload(self.br)
+        self.assertEqual(p["productType"], "CADDY")
+        self.assertEqual(p["requirements"], "LISTING")
+        for campo in ("brand", "bullet_point", "country_of_origin", "item_name",
+                      "product_description", "supplier_declared_dg_hz_regulation"):
+            self.assertIn(campo, p["attributes"], campo)
+        self.assertEqual(p["attributes"]["item_name"],
+                         [{"value": "Organizador De Cubiertos Olas Negro",
+                           "marketplace_id": "A1AM78C64UM0Y8", "language_tag": "es_MX"}])
+        self.assertEqual(len(p["attributes"]["bullet_point"]), 5)
+        self.assertEqual(p["attributes"]["supplier_declared_has_product_identifier_exemption"][0]
+                         ["value"], True)
+        self.assertEqual(p["attributes"]["main_product_image_locator"][0]["media_location"],
+                         self.br["fotos"]["principal"])
+        self.assertIn("other_product_image_locator_4", p["attributes"])
+        self.assertEqual(p["attributes"]["purchasable_offer"][0]["our_price"],
+                         [{"schedule": [{"value_with_tax": 209.0}]}])
+
+    def test_language_tag_segun_esquema(self):
+        cache = {"esquema": {"properties": {
+            "item_name": {"items": {"properties": {"value": {}, "language_tag": {},
+                                                   "marketplace_id": {}}}},
+            "country_of_origin": {"items": {"properties": {"value": {}, "marketplace_id": {}}}},
+            "brand": {"items": {"properties": {"value": {}, "language_tag": {}}}}}}}
+        a = borrador.payload(self.br, cache)["attributes"]
+        self.assertEqual(a["country_of_origin"], [{"value": "MX", "marketplace_id": "A1AM78C64UM0Y8"}])
+        self.assertEqual(a["brand"], [{"value": "Generic", "language_tag": "es_MX"}])
+        self.assertNotIn("list_price", a)          # el esquema mínimo no lo tiene
+
+    def test_envio(self):
+        self.br["envio"] = {"modo": "FBA", "cantidad": 7}
+        fa = borrador.payload(self.br)["attributes"]["fulfillment_availability"]
+        self.assertEqual(fa, [{"fulfillment_channel_code": "AMAZON_NA",
+                               "marketplace_id": "A1AM78C64UM0Y8"}])
+        self.br["envio"] = {"modo": "propio", "cantidad": 10}
+        fa = borrador.payload(self.br)["attributes"]["fulfillment_availability"][0]
+        self.assertEqual((fa["fulfillment_channel_code"], fa["quantity"]), ("DEFAULT", 10))
+        self.br["envio"] = {"modo": "propio", "cantidad": None}
+        with self.assertRaises(borrador.ErrorBorrador):
+            borrador.payload(self.br)
+        self.br["envio"] = {"modo": None, "cantidad": None}
+        self.assertNotIn("fulfillment_availability", borrador.payload(self.br)["attributes"])
+
+    def test_medidas_y_none(self):
+        self.br["medidas"]["articulo"].update(frente_cm=19.6, fondo_cm=7.8, alto_cm=10.2, peso_g=105.1)
+        self.br["atributos"]["item_shape"] = None
+        a = borrador.payload(self.br)["attributes"]
+        self.assertEqual(a["item_depth_width_height"][0]["width"], {"unit": "centimeters", "value": 19.6})
+        self.assertEqual(a["item_weight"][0]["value"], 105.1)
+        self.assertEqual(a["item_package_weight"][0], {"unit": "grams", "value": 198.0,
+                                                       "marketplace_id": "A1AM78C64UM0Y8"})
+        self.assertNotIn("item_shape", a)
+
+    def test_fotos_excluidas(self):
+        fuera = self.br["fotos"]["otras"][0]
+        self.br["fotos"]["excluidas"] = [fuera]
+        a = borrador.payload(self.br)["attributes"]
+        urls = [a[k][0]["media_location"] for k in a if k.startswith("other_product")]
+        self.assertNotIn(fuera, urls)
+        self.assertEqual(len(urls), 3)
+
+    def test_sin_tipo(self):
+        self.br["tipo_producto"] = None
+        with self.assertRaises(borrador.ErrorBorrador):
+            borrador.payload(self.br)
+
+    def test_huella(self):
+        h = borrador.huella(self.br)
+        reordenado = dict(reversed(list(self.br.items())))
+        self.assertEqual(borrador.huella(reordenado), h)
+        self.br["avisos"].append("otro aviso")          # no es contenido
+        self.assertEqual(borrador.huella(self.br), h)
+        self.br["titulo"] += " Nuevo"
+        self.assertNotEqual(borrador.huella(self.br), h)
+
+    def test_estado(self):
+        self.assertEqual(borrador.estado(self.br), "borrador")
+        self.br["validacion"] = {"status": "VALID", "huella": borrador.huella(self.br)}
+        self.assertEqual(borrador.estado(self.br), "validado")
+        self.br["precio"] = 249
+        self.assertEqual(borrador.estado(self.br), "borrador")
+        self.br["publicado"] = {"fecha": "2026-10-27"}
+        self.assertEqual(borrador.estado(self.br), "publicado")
+
+    def test_cambios_en_ml(self):
+        self.assertEqual(borrador.cambios_en_ml(self.br, OLAS_ITEM), [])
+        cambiado = dict(OLAS_ITEM, title="Organizador De Cubiertos Olas Negro", price=229)
+        campos = [c for c, _, _ in borrador.cambios_en_ml(self.br, cambiado)]
+        self.assertEqual(campos, ["titulo", "precio"])
+
+
 if __name__ == "__main__":
     unittest.main()

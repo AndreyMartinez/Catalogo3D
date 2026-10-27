@@ -76,7 +76,7 @@ Todo vive en `.claude/skills/publicar-amazon/`. Las pruebas sin red van en
       una variación hereda solo sus fotos; dos borradores con el mismo
       nombre reciben `-2`.
     - _Requisitos: 2.3, 3.1, 3.3, 3.5, 3.6, 6.1, 6.2, 7.3_
-  - [ ] 3.3 `payload()`, `huella()` y `cambios_en_ml()`
+  - [x] 3.3 `payload()`, `huella()` y `cambios_en_ml()`
     - Expansión de valores simples con `language_tag` y `marketplace_id`
       según el esquema; oferta, `fulfillment_availability` (FBA y propio),
       imágenes, exención de GTIN, `supplier_declared_dg_hz_regulation`.

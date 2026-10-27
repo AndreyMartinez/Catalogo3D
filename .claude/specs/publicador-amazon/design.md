@@ -238,8 +238,11 @@ flowchart LR
   confirmada), `titulo`, `vinetas`, `palabras_clave`, `precio`, `envio`,
   `foto_principal`, `medidas` y cada atributo obligatorio sin valor o sin
   enum claro.
-- `huella(borrador)` = sha256 de `payload(borrador)` en JSON canónico
-  (`sort_keys`, sin espacios).
+- `huella(borrador)` = sha256, en JSON canónico (`sort_keys`, sin espacios),
+  de los campos de contenido del borrador (SKU, tipo, título, viñetas,
+  descripción, palabras clave, atributos, medidas, fotos, precio, envío). No
+  depende del esquema, así que una versión nueva del tipo no invalida sola
+  una validación; los avisos y `por_revisar` no cuentan.
 - `payload(borrador, esquema)` → `{"productType", "requirements": "LISTING",
   "attributes"}`. Expande cada valor simple a la forma de Amazon, poniendo
   `marketplace_id` y `language_tag` solo donde el esquema del atributo los
