@@ -533,6 +533,9 @@ def armar(item, texto_descripcion, ctx, variacion=None):
         por_revisar.append("atributo:included_components")
     if not cat.get("confirmado") or not cat.get("tipo_producto"):
         por_revisar.insert(0, "tipo_producto")
+    # Los de la categoría (categoría de Amazon, características…) mandan
+    # sobre lo que se dedujo de ML.
+    atributos.update(cat.get("atributos") or {})
     if not color_:
         por_revisar.append("atributo:color")
     cache = ctx.get("esquema")

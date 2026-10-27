@@ -643,6 +643,15 @@ class Armado(unittest.TestCase):
         self.assertEqual(at["unit_count"]["type"]["value"], "unidad")
         self.assertEqual((at["number_of_boxes"], at["part_number"]), (1, "5Z-W3LH-N087"))
 
+    def test_atributos_de_la_categoria(self):
+        item = dict(OLAS_ITEM, category_id="MLM194377")
+        br = borrador.armar(item, OLAS_DESCRIPCION, self.ctx())
+        self.assertEqual(br["atributos"]["recommended_browse_nodes"], "50603088011")
+        self.assertEqual(br["atributos"]["special_feature"], ["Compartimentado", "Ligero", "Compacto"])
+        a = borrador.payload(br)["attributes"]
+        self.assertEqual([x["value"] for x in a["special_feature"]],
+                         ["Compartimentado", "Ligero", "Compacto"])
+
     def test_armar_sin_publicar_y_paquete_pesado(self):
         item = dict(OLAS_ITEM, category_id="MLM455181",
                     attributes=OLAS_ITEM["attributes"][:-1] + [_attr("SELLER_PACKAGE_WEIGHT", "1.4 kg")])

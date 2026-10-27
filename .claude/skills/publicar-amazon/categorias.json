@@ -13,7 +13,23 @@
       "nombre": "Portacontroles",
       "clave_sku": "PCON",
       "tipo_producto": "CADDY",
-      "confirmado": true
+      "confirmado": true,
+      "atributos": {
+        "recommended_browse_nodes": "50603088011",
+        "material": "Plástico",
+        "special_feature": [
+          "Compartimentado",
+          "Ligero",
+          "Compacto"
+        ],
+        "specific_uses_for_product": [
+          "Dispositivos electrónicos portátiles"
+        ],
+        "mounting_type": "Montaje en mesa",
+        "finish_type": "Mate",
+        "style": "Moderno",
+        "number_of_packs": 1
+      }
     },
     "MLM191167": {
       "nombre": "Portalápices y organizadores de escritorio",
@@ -58,5 +74,6 @@
       "tipo_producto": "SOAP_DISH",
       "confirmado": false
     }
-  }
+  },
+  "_comentario_atributos": "'atributos' por categoría se suman a cada borrador nuevo (nombres de Amazon). Los de portacontroles se aplicaron a los 9 publicados el 2026-10-27."
 }
