@@ -1062,6 +1062,8 @@ class Publicar(Comandos):
         codigo, texto = self.correr("publicar", "MLM3674350731", "--confirmo", "SR-PCUB-OLAS-NEG")
         self.assertEqual(codigo, 0)
         self.assertEqual(self.escrituras(), ["PUT"])
+        put = [p for m, p in self.llamadas if m == "PUT"][0]
+        self.assertNotIn("identifiers", put["includedData"])   # 400 fuera de la vista previa
         reg = publicar.publicadas()["SR-PCUB-OLAS-NEG"]
         self.assertEqual((reg["mlm"], reg["asin"], reg["submission_id"]),
                          ("MLM3674350731", "B0PRUEBA01", "s1"))

@@ -570,8 +570,11 @@ def cmd_publicar(args):
         if not _confirmado(args, sku_):
             print(f"\nNo se publicó. Para publicar: publicar {clave} --confirmo {sku_}")
             return 0
+        # Fuera de la vista previa Amazon no admite includedData=identifiers
+        # (400 «Cannot return identifiers outside of validation mode»): el
+        # ASIN se lee después con «estado».
         r = sp_api.pedir("PUT", _ruta_sku(sku_), {
-            "marketplaceIds": [sp_api.MARKETPLACE], "includedData": ["issues", "identifiers"],
+            "marketplaceIds": [sp_api.MARKETPLACE], "includedData": ["issues"],
             "issueLocale": sp_api.LOCALE}, cuerpo)
         print(f"\nAmazon respondió: {r.get('status')}")
         imprimir_issues(r.get("issues") or [])

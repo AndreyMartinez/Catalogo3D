@@ -3,14 +3,60 @@
   "marca": "Generic",
   "fabricante": "Genérico",
   "categorias": {
-    "MLM190943": {"nombre": "Organizadores de cubiertos", "clave_sku": "PCUB", "tipo_producto": "CADDY", "confirmado": true},
-    "MLM194377": {"nombre": "Portacontroles", "clave_sku": "PCON", "tipo_producto": "CADDY", "confirmado": false},
-    "MLM191167": {"nombre": "Portalápices y organizadores de escritorio", "clave_sku": "PLAP", "tipo_producto": "CADDY", "confirmado": false},
-    "MLM189301": {"nombre": "Portacepillos", "clave_sku": "PCEP", "tipo_producto": "TOOTHBRUSH_HOLDER", "confirmado": false},
-    "MLM151406": {"nombre": "Floreros", "clave_sku": "FLOR", "tipo_producto": "VASE", "confirmado": false},
-    "MLM187846": {"nombre": "Macetas", "clave_sku": "MACE", "tipo_producto": "PLANTER", "confirmado": false},
-    "MLM189696": {"nombre": "Esculturas", "clave_sku": "ESCU", "tipo_producto": "SCULPTURE", "confirmado": false},
-    "MLM455181": {"nombre": "Decoración", "clave_sku": "DECO", "tipo_producto": null, "confirmado": false},
-    "MLM191613": {"nombre": "Organizadores de fregadero", "clave_sku": "FREG", "tipo_producto": null, "confirmado": false}
+    "MLM190943": {
+      "nombre": "Organizadores de cubiertos",
+      "clave_sku": "PCUB",
+      "tipo_producto": "CADDY",
+      "confirmado": true
+    },
+    "MLM194377": {
+      "nombre": "Portacontroles",
+      "clave_sku": "PCON",
+      "tipo_producto": "CADDY",
+      "confirmado": true
+    },
+    "MLM191167": {
+      "nombre": "Portalápices y organizadores de escritorio",
+      "clave_sku": "PLAP",
+      "tipo_producto": "CADDY",
+      "confirmado": false
+    },
+    "MLM189301": {
+      "nombre": "Portacepillos",
+      "clave_sku": "PCEP",
+      "tipo_producto": "TOOTHBRUSH_HOLDER",
+      "confirmado": false,
+      "nota": "TOOTHBRUSH_HOLDER no acepta la exención de GTIN con marca Generic (8560, 2026-10-27); como CADDY sí pasa. Pendiente de decidir; no publicar todavía."
+    },
+    "MLM151406": {
+      "nombre": "Floreros",
+      "clave_sku": "FLOR",
+      "tipo_producto": "VASE",
+      "confirmado": false
+    },
+    "MLM187846": {
+      "nombre": "Macetas",
+      "clave_sku": "MACE",
+      "tipo_producto": "PLANTER",
+      "confirmado": false
+    },
+    "MLM189696": {
+      "nombre": "Esculturas",
+      "clave_sku": "ESCU",
+      "tipo_producto": "SCULPTURE",
+      "confirmado": false
+    },
+    "MLM455181": {
+      "nombre": "Decoración",
+      "clave_sku": "DECO",
+      "tipo_producto": "SCULPTURE",
+      "confirmado": false
+    },
+    "MLM191613": {
+      "nombre": "Organizadores de fregadero",
+      "clave_sku": "FREG",
+      "tipo_producto": "SOAP_DISH",
+      "confirmado": false
+    }
   }
 }
