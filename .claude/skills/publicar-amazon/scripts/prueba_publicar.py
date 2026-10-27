@@ -18,6 +18,7 @@ import urllib.error
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import borrador  # noqa: E402
 import esquema  # noqa: E402
 import sp_api  # noqa: E402
 
@@ -177,7 +178,7 @@ class Peticiones(unittest.TestCase):
         self.assertTrue(self.a_sp()[0].get_header("X-amz-access-token").startswith("Atza|"))
 
     def test_seis_429_dan_error(self):
-        self.guion(TOKEN_LWA, *[_http(429, "TooManyRequests")] * 6)
+        self.guion(TOKEN_LWA, *[_http(429, "TooManyRequests") for _ in range(6)])
         with self.assertRaises(sp_api.ErrorSP) as e:
             sp_api.pedir("GET", "/x")
         self.assertIn("falló 6 veces", str(e.exception))
@@ -394,6 +395,128 @@ class Revision(unittest.TestCase):
     def test_exencion(self):
         self.assertEqual(esquema.atributo_exencion(ESQUEMA_REVISION),
                          "supplier_declared_has_product_identifier_exemption")
+
+
+# ------------------------------------------------------ reglas de texto
+
+# Publicación real del Olas en ML (MLM3674350731), recortada. Es texto
+# público de la propia publicación.
+OLAS_TITULO = "Organizador De Cubiertos Olas Más Obsequios Negro"
+OLAS_DESCRIPCION = """ORGANIZADOR DE CUBIERTOS OLAS - 3 COMPARTIMENTOS
+
+Ten tus cubiertos ordenados y siempre a la mano con este portacubiertos de sobremesa.
+
+Sepáralos en sus 3 compartimentos: tenedores, cucharas y cuchillos.
+
+INCLUYE OBSEQUIO DE SIEMBRA
+Además recibes una maceta pequeña, humus y semillas para que siembres tu propia planta. Un detalle que hace de tu compra un regalo especial.
+
+CARACTERÍSTICAS
+- Portacubiertos de sobremesa con 3 compartimentos
+- Color: negro
+- Material: PLA, bioplástico biodegradable de origen vegetal, acabado mate
+
+CUIDADOS
+- Lávalo a mano con agua tibia y jabón neutro
+- Evita el sol directo y las fuentes de calor
+
+IMPORTANTE
+Pieza hecha con impresión 3D: puede presentar finas líneas de capa propias del proceso.
+
+¿Tienes dudas? Escríbenos en preguntas, con gusto te respondemos.
+
+¿Necesitas factura? Te la generamos. Solo envíanos tus datos fiscales por mensaje después de tu compra."""
+
+
+class Texto(unittest.TestCase):
+
+    def test_titulo_del_olas(self):
+        t, avisos = borrador.limpiar_titulo(OLAS_TITULO)
+        self.assertEqual(t, "Organizador De Cubiertos Olas Negro")
+        self.assertIn("«Más Obsequios»", avisos[0])
+
+    def test_titulos_reales(self):
+        casos = {
+            "Organizador De Control Remoto Más Regalos Sorpresa": "Organizador De Control Remoto",
+            "Portalapices Moderno Diseño Mas Obsequio De Cultivo": "Portalapices Moderno Diseño",
+            "Florero Decorativo Ondas, Con Regalo Cultivo Botanico Gris": "Florero Decorativo Ondas Gris",
+            "Organizador De Tocador Baño Cepillos. Más Regalo Sorpresa Negro":
+                "Organizador De Tocador Baño Cepillos Negro",
+            "Organizador De Cubiertos Más Obsequio De Siembra Gris": "Organizador De Cubiertos Gris",
+            "Portacepillos De Baño Más Regalos Savia Raiz Negro": "Portacepillos De Baño Negro",
+        }
+        for ml, esperado in casos.items():
+            self.assertEqual(borrador.limpiar_titulo(ml)[0], esperado, ml)
+
+    def test_promociones_y_caracteres(self):
+        t, avisos = borrador.limpiar_titulo("Florero ¡Envío Gratis! Oferta Negro $")
+        self.assertNotRegex(t.lower(), r"gratis|oferta|!|\$")
+        self.assertEqual(len(avisos), 2)
+
+    def test_marca_propia_al_frente(self):
+        t, _ = borrador.limpiar_titulo("Portacepillos De Baño Más Regalos Savia Raiz Negro",
+                                       marca="Savia Raíz")
+        self.assertEqual(t, "Savia Raíz Portacepillos De Baño Negro")
+        t, _ = borrador.limpiar_titulo("Florero Ondas Negro", marca="Savia Raíz")
+        self.assertEqual(t, "Savia Raíz Florero Ondas Negro")
+
+    def test_kit_de_siembra_se_queda_con_aviso(self):
+        titulo = "Kit Maceta De Escritorio Con Humus, Semillas Y Tarro Blanco Carita"
+        t, avisos = borrador.limpiar_titulo(titulo)
+        self.assertEqual(t, titulo)
+        self.assertTrue(any("restringido" in a for a in avisos))
+        texto = "KIT MACETA\n\nEste kit trae una maceta, humus y semillas.\n\n¿Tienes dudas? Escríbenos."
+        lim, _ = borrador.limpiar_descripcion(texto, kit=borrador.es_kit(titulo))
+        self.assertIn("humus y semillas", borrador.descripcion(lim))
+
+    def test_maceta_no_es_kit(self):
+        t, avisos = borrador.limpiar_titulo("Maceta Geométrica Minimalista Negra")
+        self.assertEqual(avisos, [])
+        lim, avisos = borrador.limpiar_descripcion(
+            "MACETA GEOMÉTRICA\n\nUna maceta para tu suculenta favorita.")
+        self.assertEqual(avisos, [])
+        self.assertIn("maceta para tu suculenta", borrador.descripcion(lim))
+
+    def test_descripcion_sin_obsequio_ni_cierre(self):
+        lim, avisos = borrador.limpiar_descripcion(OLAS_DESCRIPCION)
+        todo = borrador.descripcion(lim) + " ".join(borrador.vinetas(lim))
+        for fuera in ("OBSEQUIO", "humus", "semillas", "regalo", "¿Tienes dudas?", "factura"):
+            self.assertNotIn(fuera, todo)
+        self.assertIn("CARACTERÍSTICAS", borrador.descripcion(lim))
+        self.assertTrue(any("restringido" in a for a in avisos))
+        self.assertTrue(any("cierre de ML" in a for a in avisos))
+
+    def test_vinetas(self):
+        lim, _ = borrador.limpiar_descripcion(OLAS_DESCRIPCION)
+        v = borrador.vinetas(lim, "MEDIDAS: 19.6 x 7.8 x 10.2 cm.")
+        self.assertEqual(len(v), 5)
+        self.assertTrue(v[0].startswith("Ten tus cubiertos"))
+        self.assertEqual(v[1], "CARACTERÍSTICAS: Portacubiertos de sobremesa con 3 compartimentos; "
+                               "Color: negro; Material: PLA, bioplástico biodegradable de origen "
+                               "vegetal, acabado mate.")
+        self.assertEqual(v[2], "MEDIDAS: 19.6 x 7.8 x 10.2 cm.")
+        self.assertTrue(v[3].startswith("CUIDADOS: Lávalo a mano"))
+        self.assertTrue(v[4].startswith("IMPORTANTE: Pieza hecha"))
+        # Sin medidas, el segundo párrafo de entrada ocupa el lugar.
+        v = borrador.vinetas(lim)
+        self.assertTrue(v[1].startswith("Sepáralos"))
+
+    def test_sin_descripcion(self):
+        lim, _ = borrador.limpiar_descripcion("¿Necesitas factura? Te la generamos.")
+        self.assertEqual(lim, [])
+        self.assertEqual(borrador.vinetas(lim, "MEDIDAS: 1 cm."), ["MEDIDAS: 1 cm."])
+
+    def test_palabras_clave(self):
+        claves = borrador.palabras_clave(
+            OLAS_TITULO, "Organizador De Cubiertos Olas Negro",
+            ["Hogar, Muebles y Jardín", "Cocina", "Organizadores de Cubiertos"])
+        palabras = claves.split()
+        self.assertIn("cocina", palabras)
+        for fuera in ("organizador", "cubiertos", "obsequios", "de", "y"):
+            self.assertNotIn(fuera, palabras)
+        self.assertEqual(len(palabras), len(set(palabras)))
+        largo = borrador.palabras_clave("", "", ["palabra" + "x" * 20 + str(i) for i in range(40)])
+        self.assertLess(len(largo.encode("utf-8")), 250)
 
 
 if __name__ == "__main__":

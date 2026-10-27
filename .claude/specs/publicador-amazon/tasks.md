@@ -53,7 +53,7 @@ Todo vive en `.claude/skills/publicar-amazon/`. Las pruebas sin red van en
     - _Requisitos: 4.2, 5.3, 5.4_
 
 - [ ] 3. Del ítem de ML al borrador (`borrador.py`)
-  - [ ] 3.1 Reglas de texto
+  - [x] 3.1 Reglas de texto
     - Limpieza de título, secciones de la descripción, viñetas,
       descripción y palabras clave; avisos de lo que se quitó y del kit.
     - Prueba con la ficha pública del Olas (título, descripción y

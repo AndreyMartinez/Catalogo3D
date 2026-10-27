@@ -157,6 +157,8 @@ def _access_token(forzar=False):
             codigo = json.loads(e.read()).get("error", "")
         except ValueError:
             codigo = ""
+        finally:
+            e.close()
         raise ErrorSP(
             f"Amazon no renovó el acceso ({e.code} {codigo}). Si el error es "
             "invalid_grant o invalid_client, autoriza la app otra vez en Seller "
@@ -210,6 +212,7 @@ def pedir(metodo, ruta, params=None, cuerpo=None):
         except urllib.error.HTTPError as e:
             _ultima = _reloj()
             detalle = e.read().decode("utf-8", "replace")[:1500]
+            e.close()
             if e.code in (401, 403) and not renovado:
                 renovado, intento = True, 0
                 continue

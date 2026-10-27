@@ -191,11 +191,14 @@ flowchart LR
     marca falsa) y colapsa espacios. Guarda en
     `avisos` qué quitó.
   - **Secciones de la descripción**: parte el texto en bloques por líneas en
-    MAYÚSCULAS. Descarta los bloques de obsequio o kit (`obsequio`, `regalo`,
-    `siembra`, `semilla`, `humus`, `cultivo` en el encabezado o en el
-    cuerpo) y los de cierre de ML (`¿Tienes dudas?`, `factura`). Avisa que el
-    kit es posiblemente restringido (Req. 4.3). «Maceta» sola no cuenta:
-    en macetas y floreros es el producto mismo.
+    MAYÚSCULAS. Descarta las secciones del obsequio («INCLUYE REGALO
+    SORPRESA», «INCLUYE OBSEQUIO DE SIEMBRA/CULTIVO…»), las frases que lo
+    prometen («recibes una maceta pequeña, humus y semillas», «regalo
+    sorpresa») y el cierre de ML (`¿Tienes dudas?`, `¿Necesitas factura?`).
+    Avisa que el kit es posiblemente restringido (Req. 4.3). «IDEAL PARA
+    REGALAR» se queda: sugiere ocasión, no promete nada. «Maceta» sola no
+    cuenta: en macetas y floreros es el producto mismo. Los dos «Kit Maceta»
+    (el kit es el producto) no pierden nada y llevan el aviso de restringido.
   - **Viñetas** (Req. 3.4): hasta 5, de los bloques que quedan: primer
     párrafo, `CARACTERÍSTICAS` (renglones `- …` juntos), `CUIDADOS`,
     `IMPORTANTE` y una de medidas armada con las medidas del borrador.
