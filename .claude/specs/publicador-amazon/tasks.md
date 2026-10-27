@@ -52,7 +52,7 @@ Todo vive en `.claude/skills/publicar-amazon/`. Las pruebas sin red van en
       da `None`.
     - _Requisitos: 4.2, 5.3, 5.4_
 
-- [ ] 3. Del ítem de ML al borrador (`borrador.py`)
+- [x] 3. Del ítem de ML al borrador (`borrador.py`)
   - [x] 3.1 Reglas de texto
     - Limpieza de título, secciones de la descripción, viñetas,
       descripción y palabras clave; avisos de lo que se quitó y del kit.
@@ -84,7 +84,7 @@ Todo vive en `.claude/skills/publicar-amazon/`. Las pruebas sin red van en
       claves; envío propio sin cantidad da error; FBA no lleva cantidad; el
       payload del Olas trae los seis obligatorios de `CADDY`.
     - _Requisitos: 3.2, 4.8, 7.1, 7.2, 8.3, 8.4_
-  - [ ] 3.4 `fotos_ok()`
+  - [x] 3.4 `fotos_ok()`
     - `GET` con `Range`, tipo de contenido y medidas de JPEG o WebP.
     - Prueba sin red con los primeros bytes de un JPEG chico armado en la
       prueba; en vivo, la foto principal del Olas mide 1200 px.

@@ -728,3 +728,84 @@ def cambios_en_ml(br, item, variacion=None):
              "fotos": [principal] + otras if principal else []}
     return [(c, origen.get(c), ahora[c]) for c in ("titulo", "precio", "fotos")
             if origen.get(c) != ahora[c]]
+
+
+# ----------------------------------------------------------- fotos en red
+
+LADO_MINIMO = 1000     # Amazon pide ≥ 1000 px en el lado mayor para el zoom
+BYTES_CABECERA = 65535
+
+
+def _abrir(pedido, timeout=None):     # se sustituye en las pruebas
+    import urllib.request
+    return urllib.request.urlopen(pedido, timeout=timeout)
+
+
+def medidas_imagen(datos):
+    """(ancho, alto) leídos del encabezado de un JPEG, PNG o WebP, o None."""
+    import struct
+    if datos[:8] == b"\x89PNG\r\n\x1a\n" and len(datos) >= 24:
+        return struct.unpack(">II", datos[16:24])
+    if datos[:4] == b"RIFF" and datos[8:12] == b"WEBP":
+        trozo = datos[12:16]
+        if trozo == b"VP8 " and len(datos) >= 30:
+            ancho, alto = struct.unpack("<HH", datos[26:30])
+            return ancho & 0x3FFF, alto & 0x3FFF
+        if trozo == b"VP8L" and len(datos) >= 25:
+            b = datos[21:25]
+            return (1 + (((b[1] & 0x3F) << 8) | b[0]),
+                    1 + (((b[3] & 0xF) << 10) | (b[2] << 2) | ((b[1] & 0xC0) >> 6)))
+        if trozo == b"VP8X" and len(datos) >= 30:
+            return (1 + int.from_bytes(datos[24:27], "little"),
+                    1 + int.from_bytes(datos[27:30], "little"))
+        return None
+    if datos[:2] != b"\xff\xd8":
+        return None
+    i = 2
+    while i + 9 < len(datos):
+        if datos[i] != 0xFF:
+            return None
+        marca = datos[i + 1]
+        if marca in (0xD8, 0x01) or 0xD0 <= marca <= 0xD7:
+            i += 2
+            continue
+        largo = struct.unpack(">H", datos[i + 2:i + 4])[0]
+        if marca in (0xC0, 0xC1, 0xC2, 0xC3, 0xC5, 0xC6, 0xC7, 0xC9, 0xCA, 0xCB, 0xCD, 0xCE, 0xCF):
+            alto, ancho = struct.unpack(">HH", datos[i + 5:i + 9])
+            return ancho, alto
+        i += 2 + largo
+    return None
+
+
+def revisar_foto(url):
+    """{url, ok, ancho, alto, aviso}. Pide solo los primeros 64 KB (mlstatic
+    no acepta HEAD) y lee el tamaño del encabezado."""
+    import urllib.error
+    import urllib.request
+    pedido = urllib.request.Request(url, headers={"Range": f"bytes=0-{BYTES_CABECERA}",
+                                                  "User-Agent": "PublicadorSaviaRaiz/1.0"})
+    try:
+        with _abrir(pedido, timeout=30) as r:
+            tipo = (r.headers.get("Content-Type") or "") if getattr(r, "headers", None) else ""
+            datos = r.read(BYTES_CABECERA + 1)
+    except (urllib.error.URLError, OSError) as e:
+        return {"url": url, "ok": False, "ancho": None, "alto": None,
+                "aviso": f"No responde: {getattr(e, 'reason', e)}"}
+    if tipo and not tipo.startswith("image/"):
+        return {"url": url, "ok": False, "ancho": None, "alto": None,
+                "aviso": f"No es una imagen ({tipo})."}
+    tam = medidas_imagen(datos)
+    if not tam:
+        return {"url": url, "ok": False, "ancho": None, "alto": None,
+                "aviso": "No se pudo leer el tamaño (¿no es JPEG, PNG ni WebP?)."}
+    ancho, alto = tam
+    aviso = None
+    if max(ancho, alto) < LADO_MINIMO:
+        aviso = (f"Mide {ancho}×{alto} px; Amazon pide al menos {LADO_MINIMO} px en el lado "
+                 "mayor para el zoom.")
+    return {"url": url, "ok": True, "ancho": ancho, "alto": alto, "aviso": aviso}
+
+
+def fotos_ok(urls):
+    """Revisa varias fotos; devuelve la lista de resultados en el mismo orden."""
+    return [revisar_foto(u) for u in urls if u]

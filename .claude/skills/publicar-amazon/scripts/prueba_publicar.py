@@ -10,6 +10,7 @@ import base64
 import hashlib
 import io
 import json
+import struct
 import os
 import sys
 import tempfile
@@ -755,6 +756,80 @@ class Payload(unittest.TestCase):
         cambiado = dict(OLAS_ITEM, title="Organizador De Cubiertos Olas Negro", price=229)
         campos = [c for c, _, _ in borrador.cambios_en_ml(self.br, cambiado)]
         self.assertEqual(campos, ["titulo", "precio"])
+
+
+# ------------------------------------------------------------- fotos en red
+
+def _jpeg(ancho, alto):
+    """Encabezado mínimo de JPEG: SOI, un APP0 y el SOF0 con el tamaño."""
+    app0 = b"\xff\xe0" + struct.pack(">H", 16) + b"JFIF\x00" + b"\x00" * 9
+    sof0 = b"\xff\xc0" + struct.pack(">HBHH", 17, 8, alto, ancho) + b"\x03" + b"\x00" * 9
+    return b"\xff\xd8" + app0 + sof0
+
+
+def _png(ancho, alto):
+    return b"\x89PNG\r\n\x1a\n" + b"\x00\x00\x00\rIHDR" + struct.pack(">II", ancho, alto)
+
+
+def _webp_vp8x(ancho, alto):
+    return (b"RIFF\x00\x00\x00\x00WEBPVP8X" + b"\x00" * 8
+            + (ancho - 1).to_bytes(3, "little") + (alto - 1).to_bytes(3, "little"))
+
+
+class _RespuestaFoto(_Respuesta):
+    def __init__(self, cuerpo, tipo="image/jpeg"):
+        super().__init__(cuerpo)
+        self.headers = {"Content-Type": tipo}
+
+    def read(self, n=None):
+        return self._cuerpo
+
+
+class Fotos(unittest.TestCase):
+
+    def setUp(self):
+        self.guardado = borrador._abrir
+
+    def tearDown(self):
+        borrador._abrir = self.guardado
+
+    def servir(self, cuerpo, tipo="image/jpeg"):
+        self.pedidos = []
+
+        def abrir(pedido, timeout=None):
+            self.pedidos.append(pedido)
+            if isinstance(cuerpo, Exception):
+                raise cuerpo
+            return _RespuestaFoto(cuerpo, tipo)
+        borrador._abrir = abrir
+
+    def test_tamanos(self):
+        self.assertEqual(borrador.medidas_imagen(_jpeg(1200, 896)), (1200, 896))
+        self.assertEqual(borrador.medidas_imagen(_png(1024, 768)), (1024, 768))
+        self.assertEqual(borrador.medidas_imagen(_webp_vp8x(1500, 1000)), (1500, 1000))
+        self.assertIsNone(borrador.medidas_imagen(b"<html>"))
+
+    def test_foto_grande(self):
+        self.servir(_jpeg(1200, 896))
+        r = borrador.revisar_foto("https://x/D_1-F.jpg")
+        self.assertEqual((r["ok"], r["ancho"], r["alto"], r["aviso"]), (True, 1200, 896, None))
+        self.assertEqual(self.pedidos[0].get_header("Range"), "bytes=0-65535")
+
+    def test_foto_chica(self):
+        self.servir(_jpeg(500, 373))
+        r = borrador.revisar_foto("https://x/D_1-O.jpg")
+        self.assertTrue(r["ok"])
+        self.assertIn("500×373", r["aviso"])
+
+    def test_no_es_imagen(self):
+        self.servir(b"<html>no</html>", "text/html")
+        self.assertFalse(borrador.revisar_foto("https://x/pagina")["ok"])
+
+    def test_no_responde(self):
+        self.servir(urllib.error.URLError("sin red"))
+        r = borrador.revisar_foto("https://x/D_1-F.jpg")
+        self.assertFalse(r["ok"])
+        self.assertIn("No responde", r["aviso"])
 
 
 if __name__ == "__main__":
