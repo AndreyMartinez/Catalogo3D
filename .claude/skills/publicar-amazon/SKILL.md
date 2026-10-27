@@ -76,11 +76,12 @@ existe.
 
 ## Después de publicar
 
-- **«Falta la oferta»** en Seller Central durante las primeras horas es
-  normal aunque Amazon haya respondido `ACCEPTED` con precio y piezas: los 10
-  portacontroles del 2026-10-27 salieron así y se activaron solos en unas
-  horas. Si urge, abrir la publicación en Seller Central y «Guardar y
-  finalizar» sin cambios la activa. La API (`estado`) tarda más que Seller
+- **«Falta la oferta»**: los 10 portacontroles del 2026-10-27 se publicaron
+  sin `skip_offer` y quedaron `DISCOVERABLE` sin oferta aunque traían precio
+  y piezas. Los que recibieron `skip_offer: false` (por PATCH junto con
+  `purchasable_offer` y `fulfillment_availability`, o al «Guardar y
+  finalizar» en Seller Central) pasaron a `BUYABLE` en minutos. `payload()`
+  ya lo manda desde el principio. La API (`estado`) tarda más que Seller
   Central en mostrar la oferta: manda lo que diga Seller Central.
 - **El ASIN puede cambiar** después de un PATCH (el Olas pasó de B0HP8CH8LT a
   B0HPDXMY67 al corregir el color). `estado` actualiza `publicadas.json`.
