@@ -511,8 +511,22 @@ def armar(item, texto_descripcion, ctx, variacion=None):
         except ValueError:
             pass
 
+    # Los que Amazon exige por reglas condicionales (la vista previa del Olas
+    # los pidió); el Olas publicado a mano los trae con esta forma.
+    modelo = _limpiar_espacios(_COLORES.sub(" ", titulo)) if color_ else titulo
+    atributos.update({
+        "model_name": modelo,
+        "model_number": sku_,
+        "number_of_items": 1,
+        "unit_count": {"value": 1.0, "type": {"value": "unidad", "language_tag": LOCALE}},
+        "included_components": modelo,
+        "batteries_required": False,
+    })
+
     por_revisar = ["titulo", "vinetas", "descripcion", "palabras_clave", "precio",
                    "envio", "foto_principal", "medidas"]
+    if kit:
+        por_revisar.append("atributo:included_components")
     if not cat.get("confirmado") or not cat.get("tipo_producto"):
         por_revisar.insert(0, "tipo_producto")
     if not color_:

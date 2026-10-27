@@ -106,8 +106,8 @@ Todo vive en `.claude/skills/publicar-amazon/`. Las pruebas sin red van en
     - Prueba: `aprobar` de un campo que no existe avisa y no cambia nada.
     - _Requisitos: 3.6, 4.4_
 
-- [ ] 5. Validar y comparar con el Olas
-  - [ ] 5.1 `validar`
+- [x] 5. Validar y comparar con el Olas
+  - [x] 5.1 `validar`
     - Revisión local; si pasa, PUT con `mode=VALIDATION_PREVIEW`,
       `includedData=issues,identifiers`, `issueLocale=es_MX`; guardar
       resultado y huella; reconocer el issue de exención de GTIN.
@@ -115,7 +115,7 @@ Todo vive en `.claude/skills/publicar-amazon/`. Las pruebas sin red van en
       de issues en español, y el Olas en Amazon no cambia (GET antes y
       después, mismo `lastUpdatedDate`).
     - _Requisitos: 4.8, 8.1, 8.2, 8.3, 8.4, 8.5, 10.1_
-  - [ ] 5.2 `comparar` y `estado`
+  - [x] 5.2 `comparar` y `estado`
     - GET de solo lectura del SKU; tabla lado a lado contra el borrador;
       `estado` con ASIN, estado e issues, y el aviso de foto principal.
     - Prueba en vivo: `comparar MLM3674350731` muestra las diferencias

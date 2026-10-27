@@ -234,6 +234,11 @@ flowchart LR
     esquema lo tiene), `country_of_origin=MX`, `condition_type=new_new`,
     `item_type_keyword` / `recommended_browse_nodes` si el esquema los pide
     (quedan «por revisar»).
+- **Atributos condicionales** que la vista previa del Olas pidió (2026-10-27)
+  aunque el esquema no los marca como obligatorios: `model_name` (título sin
+  color), `model_number` (el SKU), `number_of_items` 1, `unit_count` «1
+  unidad», `included_components` (el modelo; «por revisar» en los kits) y
+  `batteries_required` false. Con ellos el Olas da `VALID`.
 - `por_revisar` inicial: `tipo_producto` (si la categoría no está
   confirmada), `titulo`, `vinetas`, `palabras_clave`, `precio`, `envio`,
   `foto_principal`, `medidas` y cada atributo obligatorio sin valor o sin

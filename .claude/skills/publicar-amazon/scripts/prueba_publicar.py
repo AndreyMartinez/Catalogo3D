@@ -635,6 +635,12 @@ class Armado(unittest.TestCase):
         for campo in ("titulo", "vinetas", "precio", "envio", "foto_principal", "medidas"):
             self.assertIn(campo, br["por_revisar"])
         self.assertEqual(br["envio"], {"modo": None, "cantidad": None})
+        # Los que la vista previa del Olas pidió por reglas condicionales.
+        at = br["atributos"]
+        self.assertEqual(at["model_name"], "Organizador De Cubiertos Olas")
+        self.assertEqual(at["model_number"], "5Z-W3LH-N087")
+        self.assertEqual((at["number_of_items"], at["batteries_required"]), (1, False))
+        self.assertEqual(at["unit_count"]["type"]["value"], "unidad")
 
     def test_armar_sin_publicar_y_paquete_pesado(self):
         item = dict(OLAS_ITEM, category_id="MLM455181",
@@ -902,6 +908,79 @@ class Comandos(unittest.TestCase):
         item = {"id": "MLM1", "variations": [{"id": 7}, {"id": 8}]}
         self.assertEqual(publicar.claves_de_item(item), ["MLM1-7", "MLM1-8"])
         self.assertEqual(publicar.claves_de_item({"id": "MLM2"}), ["MLM2"])
+
+
+# --------------------------------------------- validar y comparar (sin red)
+
+class Validar(Comandos):
+
+    def setUp(self):
+        super().setUp()
+        self.guardado_sp = (sp_api.pedir, sp_api._cred, esquema.esquema)
+        sp_api._cred = dict(CRED_FALSAS)
+        esquema.esquema = lambda tipo: {"tipo": tipo, "esquema": {"properties": {}}}
+        self.llamadas = []
+
+    def tearDown(self):
+        sp_api.pedir, sp_api._cred, esquema.esquema = self.guardado_sp
+        super().tearDown()
+
+    def amazon(self, respuesta):
+        def pedir(metodo, ruta, params=None, cuerpo=None):
+            self.llamadas.append((metodo, ruta, params, cuerpo))
+            return respuesta
+        sp_api.pedir = pedir
+
+    def test_valido_guarda_huella(self):
+        self.amazon({"status": "VALID", "issues": []})
+        codigo, texto = self.correr("validar", "MLM3674350731")
+        self.assertEqual(codigo, 0)
+        metodo, ruta, params, cuerpo = self.llamadas[0]
+        self.assertEqual(metodo, "PUT")
+        self.assertEqual(params["mode"], "VALIDATION_PREVIEW")
+        self.assertTrue(ruta.endswith("/A1PRUEBA0000XX/SR-PCUB-OLAS-NEG"))
+        self.assertEqual(cuerpo["productType"], "CADDY")
+        br = publicar.leer_borrador("MLM3674350731")
+        self.assertEqual(borrador.estado(br), "validado")
+        br["titulo"] = "Otro"
+        self.assertEqual(borrador.estado(br), "borrador")
+
+    def test_invalido_y_gtin(self):
+        self.amazon({"status": "INVALID", "issues": [
+            {"code": "8541", "severity": "ERROR", "message": "Falta el GTIN",
+             "attributeNames": ["externally_assigned_product_identifier"]}]})
+        codigo, texto = self.correr("validar", "MLM3674350731")
+        self.assertEqual(codigo, 1)
+        self.assertIn("exención de GTIN", texto)
+        self.assertEqual(borrador.estado(publicar.leer_borrador("MLM3674350731")), "borrador")
+
+    def test_error_local_no_llama_a_amazon(self):
+        esquema.esquema = lambda tipo: {"tipo": tipo, "esquema": {
+            "required": ["batteries_required", "algo_que_falta"], "properties": {}}}
+        self.amazon({"status": "VALID"})
+        codigo, texto = self.correr("validar", "MLM3674350731")
+        self.assertEqual(codigo, 1)
+        self.assertIn("algo_que_falta", texto)
+        self.assertEqual(self.llamadas, [])
+
+    def test_issue_de_imagen(self):
+        self.assertTrue(publicar.es_issue_imagen(
+            {"message": "La imagen principal no tiene fondo blanco",
+             "attributeNames": ["main_product_image_locator"]}))
+        self.assertFalse(publicar.es_issue_gtin({"message": "Falta el color", "attributeNames": ["color"]}))
+
+    def test_diferencias(self):
+        amazon = {"color": [{"value": "Plateado", "language_tag": "es_MX", "marketplace_id": "X"}],
+                  "number_of_compartments": [{"value": 6, "marketplace_id": "X"}],
+                  "brand": [{"value": "Generic", "language_tag": "es_MX"}],
+                  "capacity": [{"unit": "liters", "value": 2.5}]}
+        propuesto = {"color": [{"value": "Negro", "language_tag": "es_MX"}],
+                     "number_of_compartments": [{"value": 3}],
+                     "brand": [{"value": "Generic", "marketplace_id": "Y"}]}
+        filas = publicar.diferencias(amazon, propuesto)
+        self.assertEqual([f[0] for f in filas], ["capacity", "color", "number_of_compartments"])
+        self.assertEqual(filas[1][1:], ("Plateado", "Negro"))
+        self.assertIsNone(filas[0][2])
 
 
 if __name__ == "__main__":

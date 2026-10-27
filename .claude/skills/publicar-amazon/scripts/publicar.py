@@ -329,6 +329,180 @@ def cmd_aprobar(args):
     return 0
 
 
+# ------------------------------------------------------------ Amazon
+
+RUTA_LISTINGS = "/listings/2021-08-01/items"
+_GTIN = ("externally_assigned_product_identifier", "product_identifier_exemption")
+
+
+def _ruta_sku(sku_):
+    import urllib.parse
+    return f"{RUTA_LISTINGS}/{sp_api.seller_id()}/{urllib.parse.quote(sku_, safe='')}"
+
+
+def leer_listing(sku_, incluir=("summaries", "attributes", "issues", "offers",
+                                "fulfillmentAvailability", "productTypes")):
+    """El SKU tal como está en Amazon, o None si no existe."""
+    try:
+        return sp_api.pedir("GET", _ruta_sku(sku_), {
+            "marketplaceIds": [sp_api.MARKETPLACE], "includedData": list(incluir),
+            "issueLocale": sp_api.LOCALE})
+    except sp_api.ErrorSP as e:
+        if "-> 404" in str(e):
+            return None
+        raise
+
+
+def es_issue_gtin(issue):
+    nombres = " ".join(issue.get("attributeNames") or [])
+    texto = (issue.get("message") or "").lower()
+    return any(g in nombres for g in _GTIN) or "gtin" in texto or "exenci" in texto
+
+
+def es_issue_imagen(issue):
+    nombres = " ".join(issue.get("attributeNames") or [])
+    texto = (issue.get("message") or "").lower()
+    return "image_locator" in nombres or "imagen" in texto or "image" in texto
+
+
+def imprimir_issues(issues, marca="Generic"):
+    if not issues:
+        print("  Sin observaciones de Amazon.")
+        return
+    for i in issues:
+        donde = ", ".join(i.get("attributeNames") or []) or "general"
+        signo = {"ERROR": "✖", "WARNING": "⚠"}.get(i.get("severity"), "·")
+        print(f"  {signo} [{i.get('code')}] {donde}: {i.get('message')}")
+        if es_issue_gtin(i):
+            print(f"      → Es la exención de GTIN: la marca {marca} no la tiene para este tipo. "
+                  "Se tramita en Seller Central → Catálogo → Exención de GTIN; no reintento.")
+        if es_issue_imagen(i):
+            print("      → Es de la foto principal: esta sí hay que cambiarla "
+                  "(fondo blanco puro, sin texto ni accesorios).")
+
+
+def cmd_validar(args):
+    errores = 0
+    for c in args.claves:
+        clave = c.upper()
+        br = leer_borrador(clave)
+        print(f"\n=== {clave} · {br['sku']} ===")
+        if not br.get("tipo_producto"):
+            print("  Falta el tipo de producto en el borrador (y en categorias.json).")
+            errores += 1
+            continue
+        cache = esquema.esquema(br["tipo_producto"])
+        try:
+            cuerpo = borrador.payload(br, cache)
+        except borrador.ErrorBorrador as e:
+            print(f"  ✖ {e}")
+            errores += 1
+            continue
+        locales = [h for h in esquema.revisar(cuerpo["attributes"], cache) if h["tipo"] == "error"]
+        if locales:
+            print("  Antes de mandarlo a Amazon hay que corregir:")
+            for h in locales:
+                print(f"  ✖ {h['campo']}: {h['detalle']}")
+            errores += 1
+            continue
+        r = sp_api.pedir("PUT", _ruta_sku(br["sku"]), {
+            "marketplaceIds": [sp_api.MARKETPLACE], "mode": "VALIDATION_PREVIEW",
+            "includedData": ["issues", "identifiers"], "issueLocale": sp_api.LOCALE},
+            cuerpo)
+        estado_ = r.get("status")
+        issues = r.get("issues") or []
+        br["validacion"] = {"fecha": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                            "huella": borrador.huella(br), "status": estado_, "issues": issues}
+        guardar_privado(ruta_borrador(clave), br)
+        print(f"  Vista previa de Amazon: {estado_} (no se creó ni cambió nada)")
+        imprimir_issues(issues, (br.get("atributos") or {}).get("brand", "Generic"))
+        if estado_ != "VALID":
+            errores += 1
+        elif br.get("por_revisar"):
+            print(f"  Válido para Amazon. Para publicar falta aprobar: {', '.join(br['por_revisar'])}.")
+    return 1 if errores else 0
+
+
+def _simple(entradas):
+    """Valor de un atributo sin marketplace_id ni language_tag, para comparar."""
+    salida = []
+    for e in entradas or []:
+        if isinstance(e, dict):
+            d = {k: v for k, v in e.items() if k not in ("marketplace_id", "language_tag")}
+            salida.append(d["value"] if list(d) == ["value"] else d)
+        else:
+            salida.append(e)
+    return salida[0] if len(salida) == 1 else salida
+
+
+def _corto(valor, ancho=60):
+    texto = valor if isinstance(valor, str) else json.dumps(valor, ensure_ascii=False)
+    return texto if len(texto) <= ancho else texto[:ancho - 1] + "…"
+
+
+def diferencias(publicado, propuesto):
+    """[(atributo, en Amazon, en el borrador)] de lo que no coincide."""
+    filas = []
+    for nombre in sorted(set(publicado) | set(propuesto)):
+        a, b = _simple(publicado.get(nombre)), _simple(propuesto.get(nombre))
+        if json.dumps(a, sort_keys=True) != json.dumps(b, sort_keys=True):
+            filas.append((nombre, a if nombre in publicado else None,
+                          b if nombre in propuesto else None))
+    return filas
+
+
+def cmd_comparar(args):
+    for c in args.claves:
+        clave = c.upper()
+        br = leer_borrador(clave)
+        actual = leer_listing(br["sku"])
+        print(f"\n=== {clave} · {br['sku']} ===")
+        if actual is None:
+            print("  Ese SKU no existe en Amazon: nada que comparar.")
+            continue
+        resumen = (actual.get("summaries") or [{}])[0]
+        print(f"  ASIN {resumen.get('asin')} · {', '.join(resumen.get('status') or [])} · "
+              f"tipo {(actual.get('productTypes') or [{}])[0].get('productType')}")
+        cache = _esquema_de(br.get("tipo_producto"))
+        propuesto = borrador.payload(br, cache)["attributes"]
+        filas = diferencias(actual.get("attributes") or {}, propuesto)
+        print(f"  {len(filas)} diferencias (izquierda: Amazon hoy · derecha: borrador)\n")
+        for nombre, en_amz, en_br in filas:
+            print(f"  {nombre}")
+            print(f"      Amazon:   {_corto(_txt(en_amz), 100)}")
+            print(f"      borrador: {_corto(_txt(en_br), 100)}")
+        imprimir_issues(actual.get("issues") or [])
+    return 0
+
+
+def cmd_estado(args):
+    pub = publicadas()
+    for c in args.claves:
+        clave = c.upper()
+        br = leer_json(ruta_borrador(clave))
+        sku_ = (br or {}).get("sku") or next(
+            (s for s, r in pub.items() if clave_de(r.get("mlm"), r.get("variacion")) == clave), None)
+        if not sku_:
+            print(f"{clave}: no tiene SKU todavía (ni borrador ni publicación).")
+            continue
+        actual = leer_listing(sku_, ("summaries", "issues", "offers", "fulfillmentAvailability"))
+        if actual is None:
+            print(f"{clave} · {sku_}: no está en Amazon.")
+            continue
+        r = (actual.get("summaries") or [{}])[0]
+        print(f"\n{clave} · {sku_} · ASIN {r.get('asin')} · {', '.join(r.get('status') or [])}")
+        print(f"  {r.get('itemName')}")
+        for o in actual.get("offers") or []:
+            print(f"  oferta {o.get('offerType')}: ${(o.get('price') or {}).get('amount')}")
+        for f in actual.get("fulfillmentAvailability") or []:
+            print(f"  envío {f.get('fulfillmentChannelCode')}: {f.get('quantity', '—')} piezas")
+        imprimir_issues(actual.get("issues") or [])
+        if r.get("asin") and sku_ in pub and pub[sku_].get("asin") != r["asin"]:
+            pub[sku_]["asin"] = r["asin"]
+            guardar_privado(PUBLICADAS, pub)
+    return 0
+
+
 # ------------------------------------------------------------------ main
 
 def parser():
@@ -346,6 +520,12 @@ def parser():
     p.add_argument("clave")
     p.add_argument("campos", nargs="+")
     p.set_defaults(fn=cmd_aprobar)
+    for nombre, fn, ayuda in (("validar", cmd_validar, "vista previa en Amazon (no crea nada)"),
+                              ("comparar", cmd_comparar, "lado a lado contra lo publicado"),
+                              ("estado", cmd_estado, "ASIN, estado e issues en Amazon")):
+        p = sub.add_parser(nombre, help=ayuda)
+        p.add_argument("claves", nargs="+")
+        p.set_defaults(fn=fn)
     return ap
 
 
