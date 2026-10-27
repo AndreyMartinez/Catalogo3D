@@ -121,14 +121,23 @@ Parámetros que cambian respecto de la v2:
 `{"ancho": 184, "fondo": 66.5, "redondeo": 30, "alto": 102, "perfil_intensidad": 0.055,
 "ranuras": 3, "filas": 1, "divisor_alto": 100}`.
 
-## 2026-10-25 (v4) — escalada por el usuario en Bambu
-El usuario la escaló a mano en Bambu (X ×0.916, Y ×1.039, Z ×0.879) para
-179.2×81.1×89.6 mm y la dejó con 2 por plato; con esas medidas se actualizó
-MLM3674350731. La v3 se perdió al guardar encima (se reproduce exacta con el
-generador y los parámetros de arriba). Medido el 10-26: el escalado disparejo dejó
-la pared en 1.79 (puntas) – 2.03 (frente) y el voladizo en **50.3°** (p99.9 por
-área; 256 mm² arriba de 45°, la v3 tenía 75 mm²). CLI: placa de 2 en 4 h 39 m /
-179.8 g. Respaldo: `.3mf.v4.bak` y `.png.v4.bak`.
+## 2026-10-25 (v4, ajuste del usuario en Bambu) — medidas en MercadoLibre
+El usuario escaló la v3 a mano en Bambu Studio (sin regenerar): x 0.9164, y 1.0391,
+z 0.8785, 2 piezas por plato. Por fuera queda **179.2 × 81.1 × 89.6 mm** (antes
+195.5 × 78 × 102). Al escalar en Bambu también se escalan pared, piso y divisores (la pared
+de 1.95 queda ~1.8 de frente y ~2.0 de fondo): ya no coincide con la receta rápida
+de 1.95. No hay `.v3.bak` (el archivo se sobrescribió desde Bambu); la v3 se reconstruye
+con los parámetros de arriba.
+
+Publicación **MLM3674350731** «Organizador De Cubiertos Olas Más Obsequios Negro»
+($209, flex/xd_drop_off): Ancho 8 → **17.9 cm**, Profundidad 8 → **8.1 cm**, Altura 10 →
+**9 cm** por API (PUT 200, verificado). El ancho de 8 cm era un error previo de la ficha.
+Paquete sin cambio (20 × 16 × 11, 198 g).
+
+Medido el 10-26: el escalado disparejo dejó la pared en 1.79 (puntas) – 2.03
+(frente) y el voladizo en **50.3°** (p99.9 por área; 256 mm² arriba de 45°, la v3
+tenía 75 mm²). CLI: placa de 2 en 4 h 39 m / 179.8 g. Respaldo: `.3mf.v4.bak` y
+`.png.v4.bak`.
 
 ## 2026-10-26 (v5) — «optimizar y ver si llegan a caber 3»
 Regenerada con el generador a la medida exterior de la v4 (las medidas de ML no
@@ -145,8 +154,8 @@ una corrida de 3 en vez de 2 (un cambio de placa menos cada 3 piezas).
 Miniatura y `.stl` del catálogo regenerados.
 
 ## Pendiente / conocido y no resuelto
-- Imprimir la v5 (antes: la v3): confirmar que la pared sale maciza en los valles (no dos
-  cáscaras), que el voladizo de 46.5° bajo la panza de arriba no se cae, que la
+- Imprimir la v5: confirmar que la pared sale maciza en los valles (no dos
+  cáscaras), que el voladizo de 44.8° bajo la panza de arriba no se cae, que la
   estría se ve como en la foto y que los cubiertos caben en los compartimentos
   angostos (~55 mm en la cintura).
 - La receta `portacubiertos_oleaje_m` del motor es la v2; si la v5 se queda,
