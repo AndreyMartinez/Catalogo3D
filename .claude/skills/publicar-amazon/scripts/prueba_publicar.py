@@ -6,11 +6,13 @@ nunca se toca ~/.catalogo3d/.
 
 Uso:  python3 prueba_publicar.py
 """
+import io
 import json
 import os
 import sys
 import tempfile
 import unittest
+import urllib.error
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -100,6 +102,133 @@ class Tapar(unittest.TestCase):
     def test_error_sale_tapado(self):
         e = sp_api.ErrorSP("LWA respondió: " + CRED_FALSAS["refresh_token"])
         self.assertNotIn(CRED_FALSAS["refresh_token"], str(e))
+
+
+# ------------------------------------------------------------ peticiones
+
+class _Respuesta:
+    def __init__(self, cuerpo):
+        self._cuerpo = cuerpo.encode() if isinstance(cuerpo, str) else cuerpo
+
+    def read(self):
+        return self._cuerpo
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+
+def _http(codigo, cuerpo=""):
+    return urllib.error.HTTPError("https://x", codigo, "x", {}, io.BytesIO(cuerpo.encode()))
+
+
+TOKEN_LWA = json.dumps({"access_token": "Atza|AccesoDePrueba-0000000000000000000000",
+                        "expires_in": 3600})
+
+
+class Peticiones(unittest.TestCase):
+    """sp_api.pedir con urlopen sustituido: cada llamada saca la siguiente
+    respuesta de un guion. Nadie duerme de verdad."""
+
+    def setUp(self):
+        self.guardado = (sp_api._abrir, sp_api._dormir, sp_api._cred,
+                         sp_api._token, sp_api._vence, sp_api._ultima)
+        sp_api._cred = dict(CRED_FALSAS)
+        for v in CRED_FALSAS.values():
+            sp_api._registrar_secreto(v)
+        sp_api._token, sp_api._vence, sp_api._ultima = None, 0.0, 0.0
+        self.esperas = []
+        sp_api._dormir = self.esperas.append
+        self.pedidos = []
+
+    def tearDown(self):
+        (sp_api._abrir, sp_api._dormir, sp_api._cred,
+         sp_api._token, sp_api._vence, sp_api._ultima) = self.guardado
+
+    def guion(self, *pasos):
+        pasos = list(pasos)
+
+        def abrir(pedido, timeout=None):
+            self.pedidos.append(pedido)
+            paso = pasos.pop(0)
+            if isinstance(paso, Exception):
+                raise paso
+            return _Respuesta(paso)
+        sp_api._abrir = abrir
+
+    def a_sp(self):
+        return [p for p in self.pedidos if p.full_url.startswith(sp_api.HOST)]
+
+    def test_429_y_luego_200(self):
+        self.guion(TOKEN_LWA, _http(429), '{"items": []}')
+        r = sp_api.pedir("GET", "/listings/2021-08-01/items/A1",
+                         {"marketplaceIds": [sp_api.MARKETPLACE], "x": None})
+        self.assertEqual(r, {"items": []})
+        self.assertEqual(len(self.a_sp()), 2)
+        self.assertIn(1, self.esperas)
+        url = self.a_sp()[0].full_url
+        self.assertIn("marketplaceIds=A1AM78C64UM0Y8", url)
+        self.assertNotIn("x=", url)
+        self.assertTrue(self.a_sp()[0].get_header("X-amz-access-token").startswith("Atza|"))
+
+    def test_seis_429_dan_error(self):
+        self.guion(TOKEN_LWA, *[_http(429, "TooManyRequests")] * 6)
+        with self.assertRaises(sp_api.ErrorSP) as e:
+            sp_api.pedir("GET", "/x")
+        self.assertIn("falló 6 veces", str(e.exception))
+        self.assertEqual([x for x in self.esperas if x >= 1], list(sp_api.ESPERAS))
+
+    def test_caida_de_red_reintenta(self):
+        self.guion(TOKEN_LWA, urllib.error.URLError("timeout"), "{}")
+        self.assertEqual(sp_api.pedir("GET", "/x"), {})
+
+    def test_401_renueva_una_vez(self):
+        otro = json.dumps({"access_token": "Atza|OtroAccesoRenovado-00000000000000000",
+                           "expires_in": 3600})
+        self.guion(TOKEN_LWA, _http(401), otro, '{"ok": 1}')
+        self.assertEqual(sp_api.pedir("GET", "/x"), {"ok": 1})
+        self.assertEqual(self.a_sp()[-1].get_header("X-amz-access-token"),
+                         "Atza|OtroAccesoRenovado-00000000000000000")
+
+    def test_403_persistente_explica_roles(self):
+        self.guion(TOKEN_LWA, _http(403), TOKEN_LWA, _http(403, "Unauthorized"))
+        with self.assertRaises(sp_api.ErrorSP) as e:
+            sp_api.pedir("GET", "/x")
+        self.assertIn("Product Listing", str(e.exception))
+
+    def test_400_no_reintenta(self):
+        self.guion(TOKEN_LWA, _http(400, '{"errors": [{"code": "InvalidInput"}]}'))
+        with self.assertRaises(sp_api.ErrorSP) as e:
+            sp_api.pedir("PUT", "/x", cuerpo={"a": 1})
+        self.assertIn("400", str(e.exception))
+        self.assertEqual(len(self.a_sp()), 1)
+        self.assertEqual(self.a_sp()[0].get_header("Content-type"), "application/json")
+
+    def test_ningun_secreto_en_los_errores(self):
+        eco = " ".join(CRED_FALSAS.values()) + " Atza|AccesoDePrueba-0000000000000000000000"
+        self.guion(TOKEN_LWA, _http(400, eco))
+        with self.assertRaises(sp_api.ErrorSP) as e:
+            sp_api.pedir("GET", "/x")
+        for valor in list(CRED_FALSAS.values()) + ["Atza|AccesoDePrueba"]:
+            self.assertNotIn(valor, str(e.exception))
+
+    def test_lwa_rechaza(self):
+        self.guion(_http(400, '{"error": "invalid_grant", "error_description": "' +
+                         CRED_FALSAS["refresh_token"] + '"}'))
+        with self.assertRaises(sp_api.ErrorSP) as e:
+            sp_api.pedir("GET", "/x")
+        self.assertIn("invalid_grant", str(e.exception))
+        self.assertIn("Autorizar aplicación", str(e.exception))
+        self.assertNotIn(CRED_FALSAS["refresh_token"], str(e.exception))
+
+    def test_token_se_reusa(self):
+        self.guion(TOKEN_LWA, "{}", "{}")
+        sp_api.pedir("GET", "/x")
+        sp_api.pedir("GET", "/y")
+        lwa = [p for p in self.pedidos if p.full_url == sp_api.LWA]
+        self.assertEqual(len(lwa), 1)
 
 
 if __name__ == "__main__":

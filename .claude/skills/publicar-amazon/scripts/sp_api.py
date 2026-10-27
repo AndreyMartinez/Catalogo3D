@@ -10,9 +10,14 @@ import json
 import os
 import re
 import stat
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
 from pathlib import Path
 
 HOST = "https://sellingpartnerapi-na.amazon.com"
+LWA = "https://api.amazon.com/auth/o2/token"
 MARKETPLACE = "A1AM78C64UM0Y8"   # Amazon México
 LOCALE = "es_MX"
 
@@ -96,3 +101,129 @@ def cargar_credenciales(ruta=None):
     if faltan:
         raise ErrorSP(f"A {ruta} le falta: {', '.join(faltan)}.\n\n{AYUDA_CRED}")
     return {c: str(datos[c]).strip() for c in CAMPOS}
+
+
+# ---------------------------------------------------------------- peticiones
+
+# Esperas entre reintentos ante 429, 5xx o falla de red: cinco reintentos,
+# 31 s en total. Los límites de Listings son de 5 peticiones por segundo.
+ESPERAS = (1, 2, 4, 8, 16)
+PAUSA = 0.25
+REINTENTABLES = (429, 500, 502, 503, 504)
+
+# Se sustituyen en las pruebas.
+_abrir = urllib.request.urlopen
+_dormir = time.sleep
+_reloj = time.monotonic
+
+_cred = None
+_token = None        # access token de LWA: solo en memoria
+_vence = 0.0
+_ultima = 0.0
+
+
+def credenciales():
+    global _cred
+    if _cred is None:
+        _cred = cargar_credenciales()
+    return _cred
+
+
+def seller_id():
+    return credenciales()["seller_id"]
+
+
+def _access_token(forzar=False):
+    """Access token de LWA. Dura una hora; se pide otro 2 minutos antes. No
+    se guarda en disco: el refresh token de LWA no rota."""
+    global _token, _vence
+    if _token and not forzar and _reloj() < _vence:
+        return _token
+    cred = credenciales()
+    cuerpo = urllib.parse.urlencode({
+        "grant_type": "refresh_token",
+        "refresh_token": cred["refresh_token"],
+        "client_id": cred["client_id"],
+        "client_secret": cred["client_secret"],
+    }).encode()
+    pedido = urllib.request.Request(
+        LWA, data=cuerpo,
+        headers={"Content-Type": "application/x-www-form-urlencoded"})
+    try:
+        with _abrir(pedido, timeout=30) as r:
+            datos = json.loads(r.read())
+    except urllib.error.HTTPError as e:
+        try:
+            codigo = json.loads(e.read()).get("error", "")
+        except ValueError:
+            codigo = ""
+        raise ErrorSP(
+            f"Amazon no renovó el acceso ({e.code} {codigo}). Si el error es "
+            "invalid_grant o invalid_client, autoriza la app otra vez en Seller "
+            "Central (Desarrollar aplicaciones → Autorizar aplicación) o revisa "
+            "que el client secret no haya rotado.") from None
+    except urllib.error.URLError as e:
+        raise ErrorSP(f"No hay conexión con Amazon: {e.reason}") from None
+    _token = datos["access_token"]
+    _registrar_secreto(_token)
+    _vence = _reloj() + float(datos.get("expires_in", 3600)) - 120
+    return _token
+
+
+def _url(ruta, params):
+    url = HOST + ruta
+    if params:
+        limpios = {k: (",".join(v) if isinstance(v, (list, tuple)) else v)
+                   for k, v in params.items() if v is not None}
+        url += "?" + urllib.parse.urlencode(limpios)
+    return url
+
+
+def pedir(metodo, ruta, params=None, cuerpo=None):
+    """Petición a SP-API. 'ruta' va sin el host: '/listings/2021-08-01/…'.
+    Reintenta 429, 5xx y caídas de red; con 401/403 renueva el token una vez.
+    Devuelve el JSON de la respuesta ({} si viene vacía)."""
+    global _ultima
+    url = _url(ruta, params)
+    datos = None if cuerpo is None else json.dumps(cuerpo).encode()
+    renovado = False
+    intento = 0
+    while True:
+        espera = PAUSA - (_reloj() - _ultima)
+        if espera > 0:
+            _dormir(espera)
+        encabezados = {
+            "x-amz-access-token": _access_token(forzar=renovado and intento == 0),
+            "Accept": "application/json",
+            "User-Agent": "PublicadorSaviaRaiz/1.0 (Language=Python)",
+        }
+        if datos is not None:
+            encabezados["Content-Type"] = "application/json"
+        pedido = urllib.request.Request(url, data=datos, method=metodo,
+                                        headers=encabezados)
+        motivo = None
+        try:
+            with _abrir(pedido, timeout=60) as r:
+                _ultima = _reloj()
+                texto = r.read()
+                return json.loads(texto) if texto.strip() else {}
+        except urllib.error.HTTPError as e:
+            _ultima = _reloj()
+            detalle = e.read().decode("utf-8", "replace")[:1500]
+            if e.code in (401, 403) and not renovado:
+                renovado, intento = True, 0
+                continue
+            if e.code not in REINTENTABLES:
+                pista = ""
+                if e.code == 403:
+                    pista = ("\n  (403 después de renovar: revisa que la app tenga "
+                             "los roles «Product Listing» y «Amazon Fulfillment».)")
+                raise ErrorSP(f"{metodo} {ruta} -> {e.code}: {detalle}{pista}") from None
+            motivo = f"{e.code}: {detalle}"
+        except urllib.error.URLError as e:
+            _ultima = _reloj()
+            motivo = f"sin conexión ({e.reason})"
+        if intento >= len(ESPERAS):
+            raise ErrorSP(f"{metodo} {ruta} falló {intento + 1} veces; la última: {motivo}")
+        _dormir(ESPERAS[intento])
+        intento += 1

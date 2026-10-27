@@ -12,7 +12,7 @@ Todo vive en `.claude/skills/publicar-amazon/`. Las pruebas sin red van en
 `scripts/prueba_publicar.py` (`unittest`, como
 `colecta-full/scripts/prueba_traer_datos.py`) y crecen con cada tarea.
 
-- [ ] 1. Esqueleto del skill y cliente de SP-API
+- [x] 1. Esqueleto del skill y cliente de SP-API
   - [x] 1.1 `sp_api.py`: credenciales y candados
     - `cargar_credenciales()` con los mensajes del Req. 1.3, el rechazo de
       permisos ≠ 600 (Req. 1.4) y `_tapar()` para quitar secretos de
@@ -21,13 +21,13 @@ Todo vive en `.claude/skills/publicar-amazon/`. Las pruebas sin red van en
       archivo que falta da el mensaje con los cuatro campos; `_tapar()`
       borra un secreto metido en un mensaje de error.
     - _Requisitos: 1.1, 1.3, 1.4, 1.5_
-  - [ ] 1.2 `sp_api.py`: token y peticiones
+  - [x] 1.2 `sp_api.py`: token y peticiones
     - `_access_token()` solo en memoria con renovación; `pedir()` con
       `x-amz-access-token`, reintentos 429/5xx (1-2-4-8-16 s), una
       renovación con 401/403 y 0.25 s entre llamadas. `ErrorSP` siempre
       pasa por `_tapar()`.
     - Prueba sin red: con `urlopen` sustituido, un 429 seguido de 200
-      reintenta y devuelve; cinco 429 dan `ErrorSP`; el mensaje no trae
+      reintenta y devuelve; seis 429 seguidos (cinco reintentos) dan `ErrorSP`; el mensaje no trae
       ningún valor de las credenciales.
     - Prueba en vivo, de solo lectura: `pedir("GET",
       "/listings/2021-08-01/items/{seller}", …)` lista el Olas
