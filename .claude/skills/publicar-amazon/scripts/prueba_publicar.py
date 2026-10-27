@@ -6,6 +6,8 @@ nunca se toca ~/.catalogo3d/.
 
 Uso:  python3 prueba_publicar.py
 """
+import base64
+import hashlib
 import io
 import json
 import os
@@ -16,6 +18,7 @@ import urllib.error
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import esquema  # noqa: E402
 import sp_api  # noqa: E402
 
 # Inventadas, con la forma de las reales.
@@ -229,6 +232,73 @@ class Peticiones(unittest.TestCase):
         sp_api.pedir("GET", "/y")
         lwa = [p for p in self.pedidos if p.full_url == sp_api.LWA]
         self.assertEqual(len(lwa), 1)
+
+
+# ---------------------------------------------------------------- esquema
+
+ESQUEMA_MINIMO = {"required": ["brand", "item_name"],
+                  "properties": {"item_name": {"items": {"properties": {
+                      "value": {"type": "string", "maxLength": 200}}}}}}
+
+
+class CacheDeEsquema(unittest.TestCase):
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.guardado = (esquema.CARPETA, sp_api.pedir, sp_api._abrir)
+        esquema.CARPETA = Path(self._tmp.name) / "amazon" / "esquemas"
+        esquema._vistos.clear()
+        self.version = "v1"
+        self.bajadas = 0
+        self.crudo = json.dumps(ESQUEMA_MINIMO).encode()
+
+        def pedir(metodo, ruta, params=None, cuerpo=None):
+            return {"productType": "CADDY", "displayName": "Caddy",
+                    "productTypeVersion": {"version": self.version},
+                    "propertyGroups": {"offer": {"propertyNames": ["list_price"]}},
+                    "schema": {"link": {"resource": "https://firmado/x"},
+                               "checksum": base64.b64encode(
+                                   hashlib.md5(self.crudo).digest()).decode()}}
+
+        def abrir(url, timeout=None):
+            self.bajadas += 1
+            return _Respuesta(self.crudo)
+        sp_api.pedir, sp_api._abrir = pedir, abrir
+
+    def tearDown(self):
+        esquema.CARPETA, sp_api.pedir, sp_api._abrir = self.guardado
+        esquema._vistos.clear()
+        self._tmp.cleanup()
+
+    def test_baja_una_vez_y_reusa(self):
+        c = esquema.esquema("CADDY")
+        self.assertEqual(esquema.obligatorios(c), ["brand", "item_name"])
+        self.assertEqual(c["grupos"], {"offer": ["list_price"]})
+        esquema._vistos.clear()              # otra corrida, misma versión
+        esquema.esquema("CADDY")
+        self.assertEqual(self.bajadas, 1)
+        ruta = esquema.CARPETA / "CADDY.json"
+        self.assertEqual(os.stat(ruta).st_mode & 0o777, 0o600)
+        self.assertEqual(os.stat(esquema.CARPETA).st_mode & 0o777, 0o700)
+
+    def test_version_nueva_baja_otra_vez(self):
+        esquema.esquema("CADDY")
+        esquema._vistos.clear()
+        self.version = "v2"
+        self.assertEqual(esquema.esquema("CADDY")["version"], "v2")
+        self.assertEqual(self.bajadas, 2)
+
+    def test_checksum_malo(self):
+        crudo = self.crudo
+        self.crudo = b'{"required": []}'
+        # El checksum se calcula del bueno; lo que baja es otro.
+        sp_api.pedir = (lambda viejo: lambda *a, **k: dict(
+            viejo(*a, **k), schema={"link": {"resource": "x"},
+                                    "checksum": base64.b64encode(
+                                        hashlib.md5(crudo).digest()).decode()}))(sp_api.pedir)
+        with self.assertRaises(sp_api.ErrorSP):
+            esquema.esquema("CADDY")
+        self.assertFalse((esquema.CARPETA / "CADDY.json").exists())
 
 
 if __name__ == "__main__":

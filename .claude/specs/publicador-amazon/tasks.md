@@ -35,7 +35,7 @@ Todo vive en `.claude/skills/publicar-amazon/`. Las pruebas sin red van en
     - _Requisitos: 1.1, 1.2, 1.6, 8.5_
 
 - [ ] 2. Esquema de Amazon (`esquema.py`)
-  - [ ] 2.1 Buscar tipo y cachear esquema
+  - [x] 2.1 Buscar tipo y cachear esquema
     - `buscar_tipos()`, `esquema(tipo)` con caché por
       `productTypeVersion` en `~/.catalogo3d/amazon/esquemas/` (carpeta
       700, archivos 600).
