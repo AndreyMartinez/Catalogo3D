@@ -20,6 +20,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import borrador  # noqa: E402
+import publicar  # noqa: E402
 import esquema  # noqa: E402
 import sp_api  # noqa: E402
 
@@ -830,6 +831,77 @@ class Fotos(unittest.TestCase):
         r = borrador.revisar_foto("https://x/D_1-F.jpg")
         self.assertFalse(r["ok"])
         self.assertIn("No responde", r["aviso"])
+
+
+# ----------------------------------------------------------- comandos
+
+class Comandos(unittest.TestCase):
+    """publicar.py contra una carpeta temporal en lugar de ~/.catalogo3d."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        raiz = Path(self._tmp.name)
+        self.guardado = (publicar.CARPETA, publicar.BORRADORES, publicar.PUBLICADAS)
+        publicar.CARPETA = raiz / "amazon"
+        publicar.BORRADORES = publicar.CARPETA / "borradores"
+        publicar.PUBLICADAS = publicar.CARPETA / "publicadas.json"
+        self.br = borrador.armar(OLAS_ITEM, OLAS_DESCRIPCION, {"categorias": CATEGORIAS})
+        publicar.guardar_privado(publicar.ruta_borrador("MLM3674350731"), self.br)
+
+    def tearDown(self):
+        publicar.CARPETA, publicar.BORRADORES, publicar.PUBLICADAS = self.guardado
+        self._tmp.cleanup()
+
+    def correr(self, *argv):
+        salida = io.StringIO()
+        viejo, sys.stdout = sys.stdout, salida
+        try:
+            codigo = publicar.main(list(argv))
+        finally:
+            sys.stdout = viejo
+        return codigo, salida.getvalue()
+
+    def test_permisos(self):
+        ruta = publicar.ruta_borrador("MLM3674350731")
+        self.assertEqual(os.stat(ruta).st_mode & 0o777, 0o600)
+        self.assertEqual(os.stat(publicar.BORRADORES).st_mode & 0o777, 0o700)
+
+    def test_aprobar(self):
+        codigo, texto = self.correr("aprobar", "MLM3674350731", "titulo", "precio")
+        self.assertEqual(codigo, 0)
+        br = publicar.leer_borrador("MLM3674350731")
+        self.assertNotIn("titulo", br["por_revisar"])
+        self.assertNotIn("precio", br["por_revisar"])
+
+    def test_aprobar_campo_inexistente_no_cambia(self):
+        antes = publicar.ruta_borrador("MLM3674350731").read_text()
+        codigo, texto = self.correr("aprobar", "MLM3674350731", "titulo", "inventado")
+        self.assertEqual(codigo, 1)
+        self.assertIn("inventado", texto)
+        self.assertEqual(publicar.ruta_borrador("MLM3674350731").read_text(), antes)
+
+    def test_json_roto(self):
+        publicar.ruta_borrador("MLM1").write_text('{\n "titulo": "x",\n', encoding="utf-8")
+        with self.assertRaises(publicar.ErrorPublicador) as e:
+            publicar.leer_borrador("MLM1")
+        self.assertIn("línea 3", str(e.exception))
+
+    def test_sin_borrador(self):
+        with self.assertRaises(publicar.ErrorPublicador) as e:
+            publicar.leer_borrador("MLM999")
+        self.assertIn("armar MLM999", str(e.exception))
+
+    def test_publicadas_arranca_con_el_olas(self):
+        pub = publicar.publicadas()
+        self.assertEqual(pub["5Z-W3LH-N087"]["mlm"], "MLM3674350731")
+        self.assertTrue(publicar.PUBLICADAS.exists())
+
+    def test_claves(self):
+        self.assertEqual(publicar.separar("mlm123-456"), ("MLM123", "456"))
+        self.assertEqual(publicar.separar("MLM123"), ("MLM123", None))
+        item = {"id": "MLM1", "variations": [{"id": 7}, {"id": 8}]}
+        self.assertEqual(publicar.claves_de_item(item), ["MLM1-7", "MLM1-8"])
+        self.assertEqual(publicar.claves_de_item({"id": "MLM2"}), ["MLM2"])
 
 
 if __name__ == "__main__":

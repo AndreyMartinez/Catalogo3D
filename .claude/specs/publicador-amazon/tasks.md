@@ -90,16 +90,16 @@ Todo vive en `.claude/skills/publicar-amazon/`. Las pruebas sin red van en
       prueba; en vivo, la foto principal del Olas mide 1200 px.
     - _Requisitos: 4.5_
 
-- [ ] 4. Comandos de lectura y borrador (`publicar.py`)
-  - [ ] 4.1 `lista` y `armar`
+- [x] 4. Comandos de lectura y borrador (`publicar.py`)
+  - [x] 4.1 `lista` y `armar`
     - Leer las activas con `ml_api` y `traer_datos` de `colecta-full`;
       guardar borradores sin pisar los editados y reportar cambios en ML;
       detenerse sin escribir nada si ML falla.
-    - Prueba en vivo: `lista` muestra 40 activas y las 5 con variaciones;
+    - Prueba en vivo: `lista` muestra las activas (37 el 2026-10-27, 6 con variaciones);
       `armar MLM3674350731` crea el borrador con SKU `5Z-W3LH-N087`; editar
       el título y volver a correr `armar` no lo pisa.
     - _Requisitos: 2.1, 2.2, 2.4, 3.1, 3.2, 6.1_
-  - [ ] 4.2 `ver` y `aprobar`
+  - [x] 4.2 `ver` y `aprobar`
     - Vista legible con las medidas juntas, `por_revisar`, avisos y
       hallazgos de `revisar()`; `aprobar` quita campos de `por_revisar`.
       JSON roto: archivo y línea, sin sobrescribir.
