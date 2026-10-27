@@ -74,6 +74,17 @@ existe.
   piezas de ~130 g; el Olas dice 8 cm de frente y mide 19.6). Amazon cobra
   FBA por el peso del paquete: confírmalos con el usuario.
 
+## Después de publicar
+
+- **«Falta la oferta»** en Seller Central durante las primeras horas es
+  normal aunque Amazon haya respondido `ACCEPTED` con precio y piezas: los 10
+  portacontroles del 2026-10-27 salieron así y se activaron solos en unas
+  horas. Si urge, abrir la publicación en Seller Central y «Guardar y
+  finalizar» sin cambios la activa. La API (`estado`) tarda más que Seller
+  Central en mostrar la oferta: manda lo que diga Seller Central.
+- **El ASIN puede cambiar** después de un PATCH (el Olas pasó de B0HP8CH8LT a
+  B0HPDXMY67 al corregir el color). `estado` actualiza `publicadas.json`.
+
 ## Corregir una publicación que ya existe
 
 `publicar <clave>` sobre un SKU que ya está en Amazon no lo reemplaza: enseña
@@ -85,9 +96,9 @@ python3 $S/publicar.py publicar MLM3674350731 --campos color,item_package_weight
 python3 $S/publicar.py publicar MLM3674350731 --campos color,item_package_weight --confirmo 5Z-W3LH-N087
 ```
 
-El Olas (`5Z-W3LH-N087`, ASIN B0HP8CH8LT) se publicó a mano con color
-«Plateado», 6 compartimentos y paquete de 500 g; el borrador trae Negro, 3 y
-198 g.
+El Olas (`5Z-W3LH-N087`) se publicó a mano con color «Plateado», 6
+compartimentos y paquete de 500 g; se corrigió a Negro, 3 y 198 g el
+2026-10-27. Su peso de pieza (450 g) sigue mal.
 
 ## Archivos
 
