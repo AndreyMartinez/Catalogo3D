@@ -211,14 +211,23 @@ flowchart LR
     demás, hasta 8. Si sobran, avisa.
   - **SKU** (Req. 3.3): `SR-<clave de categorias.json>-<NOMBRE>-<COLOR3>`.
     NOMBRE es la primera palabra del título limpio que no es genérica (lista
-    corta: organizador, porta…, de, control, remoto, diseño, moderno…),
-    en mayúsculas y sin acentos. COLOR3 son las 3 primeras letras del color.
-    Si choca con otro borrador o con `publicadas.json`, agrega `-2`.
-  - **Medidas** (Req. 3.6): artículo de `LENGTH/WIDTH/DEPTH/HEIGHT`; paquete
-    de `SELLER_PACKAGE_*`; peso del artículo de `peso_g`. Todo en cm y g.
+    corta: organizador, porta…, de, control, remoto, diseño, moderno…) ni
+    color, en mayúsculas y sin acentos; si no hay ninguna, los últimos 4
+    dígitos del MLM (`SR-PCON-6256-NEG`). COLOR3 son las 3 primeras letras
+    del color. Si choca con otro borrador, agrega `-2`. Si la publicación
+    ya está en `publicadas.json`, usa ese SKU.
+  - **Medidas** (Req. 3.6): artículo como `frente/fondo/alto` (frente =
+    `LENGTH` o, si no hay, `WIDTH`; fondo = `DEPTH` o `WIDTH`); paquete de
+    `SELLER_PACKAGE_*` ordenado de mayor a menor; peso del artículo de
+    `peso_g` (el catálogo solo liga 2 de las 40 publicaciones con su MLM, así
+    que casi siempre queda por llenar). Todo en cm y g. Si el paquete pesa
+    más de 600 g, aviso: en ML hay paquetes de 1–1.6 kg para piezas de
+    ~130 g, y Amazon cobra FBA por ese peso.
   - **Precio** (Req. 3.5): `original_price` si existe (las promos SMART bajan
     `price`), si no `price`. Al lado, el costo con la fórmula del catálogo,
     marcado «costo como en ML» porque incluye la paquetería del kit.
+  - **Material**: `PLA` → «Plástico» (la lista de `CADDY` no tiene PLA; el
+    Olas quedó así).
   - **Atributos simples** desde ML: `brand` y `manufacturer` salen de
     `marca` en `categorias.json` (ver Decisiones: `Generic` como el Olas, o
     «Savia Raíz» con exención tramitada), `color`, `material`, `number_of_compartments` (si el

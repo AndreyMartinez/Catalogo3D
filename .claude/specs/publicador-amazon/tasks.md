@@ -63,7 +63,7 @@ Todo vive en `.claude/skills/publicar-amazon/`. Las pruebas sin red van en
       variaciones («Más Regalos Sorpresa», «Mas Obsequio De Cultivo»)
       quedan limpios; una maceta no dispara el aviso de kit.
     - _Requisitos: 3.4, 4.1, 4.3_
-  - [ ] 3.2 Fotos, medidas, precio, SKU y atributos
+  - [x] 3.2 Fotos, medidas, precio, SKU y atributos
     - `-O.jpg → https…-F.jpg`; medidas de artículo y paquete; peso y costo
       de los archivos del catálogo; `original_price` antes que `price`;
       SKU `SR-<clave>-<NOMBRE>-<COL>` sin choques, o el de

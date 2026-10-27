@@ -270,3 +270,306 @@ def palabras_clave(titulo_ml, titulo_final, categorias=()):
         salida.append(palabra.lower())
         vistos.add(clave)
     return " ".join(salida)
+
+
+# ------------------------------------------ fotos, medidas, precio, SKU
+
+MAX_FOTOS = 9          # principal + other_product_image_locator_1..8
+# Un paquete de pieza impresa pesa 200–400 g (el del Olas, 198 g); en ML hay
+# paquetes capturados de más de 1 kg. Amazon cobra FBA por ese peso.
+PAQUETE_SOSPECHOSO_G = 600
+_COLORES = re.compile(r"\b(negr[oa]|blanc[oa]|gris|amarill[oa]|azul|roj[oa]|verde|rosa|"
+                      r"beige|caf[eé]|dorad[oa]|plateado)\b", re.IGNORECASE)
+# Material de ML → como lo dice Amazon (la lista de CADDY no tiene «PLA»;
+# el Olas quedó como «Plástico»).
+SINONIMOS_MATERIAL = {"pla": "Plástico", "pld": "Plástico", "plastico": "Plástico"}
+# Palabras del título que no sirven de nombre en el SKU.
+_GENERICAS = set("""organizador organizadores porta portacubiertos portacontroles
+portalapices portacepillos soporte de del con para y en el la los las control
+controles remoto remotos cubiertos diseno moderno minimalista decorativo
+decorativa florero maceta kit escritorio bano tocador cocina figura set
+espacios espacio redondo humus semillas tarro organizador cepillos""".split())
+
+
+def url_completa(url):
+    """URL de mlstatic en tamaño completo: la API da «-O.jpg» (500 px); la
+    misma foto con «-F.jpg» sale a 1200 px."""
+    url = (url or "").replace("http://", "https://", 1)
+    return re.sub(r"-[A-Z]\.(?:jpg|jpeg|webp|png)$", "-F.jpg", url)
+
+
+def fotos(item, variacion=None):
+    """Fotos en tamaño completo y en el orden de ML; las de la variación si
+    tiene. Devuelve (principal, otras, avisos)."""
+    todas = item.get("pictures") or []
+    if variacion and variacion.get("picture_ids"):
+        por_id = {p.get("id"): p for p in todas}
+        todas = [por_id[i] for i in variacion["picture_ids"] if i in por_id]
+    urls = [url_completa(p.get("secure_url") or p.get("url")) for p in todas]
+    urls = [u for u in urls if u]
+    avisos = []
+    if len(urls) > MAX_FOTOS:
+        avisos.append(f"ML tiene {len(urls)} fotos; Amazon acepta {MAX_FOTOS}. "
+                      f"Quedaron las primeras {MAX_FOTOS}.")
+    urls = urls[:MAX_FOTOS]
+    return (urls[0] if urls else None), urls[1:], avisos
+
+
+def _atributo(item, *ids):
+    for a in item.get("attributes") or []:
+        if a.get("id") in ids and a.get("value_name"):
+            return a
+    return None
+
+
+def _numero(atributo, unidades):
+    """'8 cm' → 8.0 en la unidad pedida ('cm' o 'g')."""
+    if not atributo:
+        return None
+    struct = atributo.get("value_struct") or {}
+    numero, unidad = struct.get("number"), struct.get("unit")
+    if numero is None:
+        m = re.match(r"\s*([\d.,]+)\s*([a-zA-Z]*)", atributo.get("value_name") or "")
+        if not m:
+            return None
+        numero, unidad = float(m.group(1).replace(",", ".")), m.group(2)
+    factor = {"cm": {"cm": 1, "mm": 0.1, "m": 100, "in": 2.54, "pulgadas": 2.54},
+              "g": {"g": 1, "kg": 1000, "mg": 0.001, "lb": 453.592}}[unidades]
+    f = factor.get((unidad or unidades).lower())
+    return round(float(numero) * f, 2) if f else None
+
+
+def medidas(item, peso_g=None):
+    """Medidas del artículo y del paquete en cm y g. En ML los ejes vienen
+    como LENGTH/WIDTH/DEPTH sin regla fija (el Olas dice WIDTH 8 y mide
+    19.6 de frente), así que quedan siempre «por revisar». El paquete se
+    ordena de mayor a menor, como lo pide Amazon."""
+    largo = _numero(_atributo(item, "LENGTH"), "cm")
+    ancho = _numero(_atributo(item, "WIDTH"), "cm")
+    fondo = _numero(_atributo(item, "DEPTH"), "cm")
+    articulo = {
+        "frente_cm": largo if largo is not None else ancho,
+        "fondo_cm": fondo if fondo is not None else (ancho if largo is not None else None),
+        "alto_cm": _numero(_atributo(item, "HEIGHT"), "cm"),
+        "peso_g": peso_g if peso_g is not None else _numero(_atributo(item, "WEIGHT"), "g"),
+    }
+    lados = [_numero(_atributo(item, f"SELLER_PACKAGE_{e}"), "cm")
+             for e in ("LENGTH", "WIDTH", "HEIGHT")]
+    lados = sorted([x for x in lados if x is not None], reverse=True)
+    paquete = {"largo_cm": None, "ancho_cm": None, "alto_cm": None,
+               "peso_g": _numero(_atributo(item, "SELLER_PACKAGE_WEIGHT"), "g")}
+    if len(lados) == 3:
+        paquete.update(largo_cm=lados[0], ancho_cm=lados[1], alto_cm=lados[2])
+    return {"articulo": articulo, "paquete": paquete}
+
+
+def vineta_medidas(med):
+    a = med["articulo"]
+    if None in (a["frente_cm"], a["fondo_cm"], a["alto_cm"]):
+        return None
+    texto = (f"MEDIDAS: {a['frente_cm']:g} cm de frente x {a['fondo_cm']:g} cm de fondo "
+             f"x {a['alto_cm']:g} cm de alto")
+    if a.get("peso_g"):
+        texto += f"; pesa {a['peso_g']:g} g"
+    return texto + "."
+
+
+def precio(item, variacion=None):
+    """Precio de lista: original_price si hay (las promos de ML bajan
+    'price' por un tiempo); si no, el de la variación o el del ítem."""
+    if item.get("original_price"):
+        return float(item["original_price"])
+    if variacion and variacion.get("price"):
+        return float(variacion["price"])
+    return float(item.get("price") or 0) or None
+
+
+def costo(peso_g, costos, paquete=None):
+    """Costo de la pieza como en el catálogo: peso × precio_kg + paquetería
+    (la del diseño o la activa). Incluye lo del kit de ML."""
+    if not peso_g or not costos:
+        return None
+    paquetes = costos.get("paquetes") or []
+    i = paquete if paquete is not None else costos.get("paquete_activo", 0)
+    caja = paquetes[i] if 0 <= (i or 0) < len(paquetes) else {"elementos": []}
+    empaque = sum(e["costo_compra"] / e["unidades"] for e in caja["elementos"] if e.get("unidades"))
+    return round(peso_g / 1000 * costos["precio_kg"] + empaque, 2)
+
+
+def pesos_del_catalogo(catalogo):
+    """{MLM: (peso_g, paquete)} desde .catalogo3d_mercadolibre.json (el MLM
+    va dentro del enlace de edición)."""
+    salida = {}
+    for datos in (catalogo or {}).values():
+        m = re.search(r"MLM\d+", datos.get("link") or "")
+        if m and datos.get("peso_g"):
+            salida[m.group(0)] = (float(datos["peso_g"]), datos.get("paquete"))
+    return salida
+
+
+def color(item, variacion=None):
+    if variacion:
+        for c in variacion.get("attribute_combinations") or []:
+            if c.get("value_name") and c.get("id") in ("COLOR", None, "MAIN_COLOR"):
+                return c["value_name"]
+    a = _atributo(item, "COLOR", "MAIN_COLOR")
+    if a:
+        return a["value_name"]
+    # Sin atributo: el último color conocido del título.
+    m = _COLORES.findall(item.get("title") or "")
+    return m[-1].capitalize() if m else None
+
+
+def _ascii(texto):
+    return re.sub(r"[^A-Z0-9]", "", _sin_acentos(texto).upper())
+
+
+def sku(clave, titulo_limpio, color_, usados, mlm=""):
+    """SR-<CLAVE>-<NOMBRE>-<COL>: NOMBRE es la primera palabra del título que
+    no es genérica ni color (si no hay, los últimos 4 dígitos del MLM); COL,
+    las 3 primeras letras del color. Si ya existe, -2, -3…"""
+    nombre = next((_ascii(p) for p in re.findall(r"[^\W\d_]+", titulo_limpio or "")
+                   if _sin_acentos(p) not in _GENERICAS and len(p) > 2
+                   and not _COLORES.fullmatch(p)), None)
+    partes = ["SR", clave or "GEN", (nombre or mlm[-4:] or "PIEZA")[:10]]
+    if color_:
+        conocido = _COLORES.search(color_)
+        partes.append(_ascii(conocido.group(0) if conocido else color_)[:3])
+    base = "-".join(partes)
+    candidato, n = base, 2
+    while candidato in usados:
+        candidato, n = f"{base}-{n}", n + 1
+    return candidato
+
+
+def _material(item):
+    a = _atributo(item, "MATERIAL", "MATERIALS")
+    texto = a["value_name"] if a else None
+    if texto is None and re.search(r"\bPLA\b", item.get("title") or ""):
+        texto = "PLA"
+    if texto is None:
+        return None
+    return SINONIMOS_MATERIAL.get(_sin_acentos(texto).strip(), texto)
+
+
+def armar(item, texto_descripcion, ctx, variacion=None):
+    """Borrador nuevo para una publicación (o una variación) de ML.
+
+    ctx: categorias (el JSON de categorias.json), pesos ({MLM: (g, paquete)}),
+    costos (.catalogo3d_costos.json), publicadas ({sku: {mlm, variacion}}),
+    skus (los ya usados), ruta_categoria ([nombres]) y esquema (caché del
+    tipo, o None). Las listas de valores de Amazon se aplican si hay esquema.
+    """
+    from esquema import opciones, valor_mas_cercano   # evita el ciclo al importar
+
+    mlm = item["id"]
+    var_id = str(variacion["id"]) if variacion else None
+    conf = ctx.get("categorias") or {}
+    marca = conf.get("marca", MARCA_GENERICA)
+    cat = (conf.get("categorias") or {}).get(item.get("category_id")) or {}
+
+    titulo, avisos = limpiar_titulo(item.get("title"), marca)
+    color_ = color(item, variacion)
+    if variacion and color_ and _sin_acentos(color_) not in _sin_acentos(titulo):
+        titulo = f"{titulo} {color_}"
+    kit = es_kit(item.get("title"))
+    limpias, avisos_desc = limpiar_descripcion(texto_descripcion, kit)
+    avisos += avisos_desc
+
+    peso, paquete_costo = (ctx.get("pesos") or {}).get(mlm, (None, None))
+    med = medidas(item, peso)
+    principal, otras, avisos_fotos = fotos(item, variacion)
+    avisos += avisos_fotos
+    if not limpias:
+        avisos.append("La publicación de ML no tiene descripción: las viñetas y la "
+                      "descripción hay que escribirlas.")
+
+    existente = next((s for s, r in (ctx.get("publicadas") or {}).items()
+                      if r.get("mlm") == mlm and str(r.get("variacion") or "") == str(var_id or "")),
+                     None)
+    sku_ = existente or sku(cat.get("clave_sku"), titulo, color_, set(ctx.get("skus") or ()), mlm)
+    if (med["paquete"]["peso_g"] or 0) > PAQUETE_SOSPECHOSO_G:
+        avisos.append(f"En ML el paquete pesa {med['paquete']['peso_g']:g} g; una pieza "
+                      "impresa suele ir en 200–400 g. Amazon cobra FBA por ese peso: revísalo.")
+
+    atributos = {
+        "brand": marca,
+        "manufacturer": conf.get("fabricante", marca),
+        "country_of_origin": "MX",
+        "condition_type": "new_new",
+        "supplier_declared_dg_hz_regulation": "not_applicable",
+    }
+    if color_:
+        atributos["color"] = color_
+    material = _material(item)
+    if material:
+        atributos["material"] = material
+    compartimentos = _atributo(item, "COMPARTMENTS_NUMBER")
+    if compartimentos:
+        try:
+            atributos["number_of_compartments"] = int(float(compartimentos["value_name"]))
+        except ValueError:
+            pass
+
+    por_revisar = ["titulo", "vinetas", "descripcion", "palabras_clave", "precio",
+                   "envio", "foto_principal", "medidas"]
+    if not cat.get("confirmado") or not cat.get("tipo_producto"):
+        por_revisar.insert(0, "tipo_producto")
+    if not color_:
+        por_revisar.append("atributo:color")
+    cache = ctx.get("esquema")
+    if cache:
+        props = cache["esquema"].get("properties") or {}
+        for nombre in list(atributos):
+            if nombre not in props:
+                del atributos[nombre]
+                continue
+            valores, nombres, cerrada = opciones(cache, nombre)
+            if valores and atributos[nombre] not in valores:
+                cercano = valor_mas_cercano(atributos[nombre], valores, nombres)
+                if cercano is not None:
+                    atributos[nombre] = cercano
+                elif cerrada:
+                    por_revisar.append(f"atributo:{nombre}")
+        for nombre in cache["esquema"].get("required") or []:
+            if nombre not in atributos and nombre not in _CAMPOS_PROPIOS:
+                atributos[nombre] = None
+                por_revisar.append(f"atributo:{nombre}")
+
+    vin_medidas = vineta_medidas(med)
+    return {
+        "mlm": mlm,
+        "variacion": var_id,
+        "sku": sku_,
+        "tipo_producto": cat.get("tipo_producto"),
+        "titulo": titulo,
+        "vinetas": vinetas(limpias, vin_medidas),
+        "descripcion": descripcion(limpias),
+        "palabras_clave": palabras_clave(item.get("title"), titulo, ctx.get("ruta_categoria") or ()),
+        "atributos": atributos,
+        "medidas": med,
+        "fotos": {"principal": principal, "otras": otras, "excluidas": []},
+        "precio": precio(item, variacion),
+        "costo_ref": costo(peso, ctx.get("costos"), paquete_costo),
+        "envio": {"modo": None, "cantidad": None},
+        "por_revisar": por_revisar,
+        "avisos": avisos,
+        "origen_ml": {
+            "titulo": item.get("title"),
+            "precio": precio(item, variacion),
+            "fotos": [principal] + otras if principal else [],
+            "categoria": item.get("category_id"),
+        },
+        "validacion": None,
+        "publicado": None,
+    }
+
+
+# Atributos que el borrador llena con sus propios campos (título, viñetas…)
+# y que payload() pone; no se piden como atributo suelto.
+_CAMPOS_PROPIOS = {"item_name", "bullet_point", "product_description", "generic_keyword",
+                   "purchasable_offer", "fulfillment_availability", "list_price",
+                   "main_product_image_locator", "supplier_declared_has_product_identifier_exemption",
+                   "externally_assigned_product_identifier", "item_depth_width_height",
+                   "item_dimensions", "item_length_width_height", "item_weight",
+                   "item_package_dimensions", "item_package_weight"}

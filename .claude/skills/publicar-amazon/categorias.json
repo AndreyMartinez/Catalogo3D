@@ -1,0 +1,16 @@
+{
+  "_comentario": "Categoría de MercadoLibre → tipo de producto de Amazon México y clave de SKU. Sin datos del negocio: se versiona. 'confirmado' lo pone el usuario después de ver el tipo en un borrador.",
+  "marca": "Generic",
+  "fabricante": "Genérico",
+  "categorias": {
+    "MLM190943": {"nombre": "Organizadores de cubiertos", "clave_sku": "PCUB", "tipo_producto": "CADDY", "confirmado": true},
+    "MLM194377": {"nombre": "Portacontroles", "clave_sku": "PCON", "tipo_producto": "CADDY", "confirmado": false},
+    "MLM191167": {"nombre": "Portalápices y organizadores de escritorio", "clave_sku": "PLAP", "tipo_producto": "CADDY", "confirmado": false},
+    "MLM189301": {"nombre": "Portacepillos", "clave_sku": "PCEP", "tipo_producto": "TOOTHBRUSH_HOLDER", "confirmado": false},
+    "MLM151406": {"nombre": "Floreros", "clave_sku": "FLOR", "tipo_producto": "VASE", "confirmado": false},
+    "MLM187846": {"nombre": "Macetas", "clave_sku": "MACE", "tipo_producto": "PLANTER", "confirmado": false},
+    "MLM189696": {"nombre": "Esculturas", "clave_sku": "ESCU", "tipo_producto": "SCULPTURE", "confirmado": false},
+    "MLM455181": {"nombre": "Decoración", "clave_sku": "DECO", "tipo_producto": null, "confirmado": false},
+    "MLM191613": {"nombre": "Organizadores de fregadero", "clave_sku": "FREG", "tipo_producto": null, "confirmado": false}
+  }
+}

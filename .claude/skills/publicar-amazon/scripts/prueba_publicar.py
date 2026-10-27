@@ -519,5 +519,144 @@ class Texto(unittest.TestCase):
         self.assertLess(len(largo.encode("utf-8")), 250)
 
 
+# --------------------------------------------- fotos, medidas, SKU, armar
+
+def _attr(id_, valor):
+    return {"id": id_, "value_name": valor}
+
+
+OLAS_ITEM = {
+    "id": "MLM3674350731", "title": OLAS_TITULO, "price": 209, "original_price": None,
+    "category_id": "MLM190943",
+    "attributes": [_attr("BRAND", "Savia Raiz"), _attr("COLOR", "Negro"), _attr("MATERIAL", "PLA"),
+                   _attr("COMPARTMENTS_NUMBER", "3"), _attr("DEPTH", "8 cm"), _attr("WIDTH", "8 cm"),
+                   _attr("HEIGHT", "10 cm"), _attr("SELLER_PACKAGE_HEIGHT", "20 cm"),
+                   _attr("SELLER_PACKAGE_LENGTH", "11 cm"), _attr("SELLER_PACKAGE_WIDTH", "16 cm"),
+                   _attr("SELLER_PACKAGE_WEIGHT", "198 g")],
+    "pictures": [{"id": f"F{i}", "url": f"http://http2.mlstatic.com/D_{i}0085-MLM1_102026-O.jpg"}
+                 for i in range(1, 6)],
+    "variations": [],
+}
+CATEGORIAS = json.loads((Path(__file__).resolve().parent.parent / "categorias.json")
+                        .read_text(encoding="utf-8"))
+COSTOS = {"precio_kg": 167.0, "paquete_activo": 0, "paquetes": [
+    {"nombre": "Paquetería", "elementos": [{"costo_compra": 16.38, "unidades": 1}]}]}
+
+
+class Armado(unittest.TestCase):
+
+    def ctx(self, **extra):
+        base = {"categorias": CATEGORIAS, "pesos": {}, "costos": COSTOS,
+                "publicadas": {}, "skus": set(), "ruta_categoria": ["Cocina"], "esquema": None}
+        base.update(extra)
+        return base
+
+    def test_categorias(self):
+        self.assertEqual(CATEGORIAS["marca"], "Generic")
+        self.assertEqual(len(CATEGORIAS["categorias"]), 9)
+        self.assertEqual(CATEGORIAS["categorias"]["MLM190943"]["tipo_producto"], "CADDY")
+        self.assertTrue(CATEGORIAS["categorias"]["MLM190943"]["confirmado"])
+
+    def test_fotos_completas_en_orden(self):
+        principal, otras, avisos = borrador.fotos(OLAS_ITEM)
+        self.assertEqual(principal, "https://http2.mlstatic.com/D_10085-MLM1_102026-F.jpg")
+        self.assertEqual(otras, [f"https://http2.mlstatic.com/D_{i}0085-MLM1_102026-F.jpg"
+                                 for i in range(2, 6)])
+        self.assertEqual(avisos, [])
+
+    def test_mas_de_nueve_fotos(self):
+        item = dict(OLAS_ITEM, pictures=OLAS_ITEM["pictures"] * 3)
+        principal, otras, avisos = borrador.fotos(item)
+        self.assertEqual(len(otras), 8)
+        self.assertIn("15 fotos", avisos[0])
+
+    def test_variacion_solo_sus_fotos(self):
+        var = {"id": 77, "picture_ids": ["F3", "F1"],
+               "attribute_combinations": [{"id": None, "value_name": "Gris"}], "price": 199}
+        principal, otras, _ = borrador.fotos(OLAS_ITEM, var)
+        self.assertIn("D_30085", principal)
+        self.assertEqual(len(otras), 1)
+        self.assertEqual(borrador.color(OLAS_ITEM, var), "Gris")
+        self.assertEqual(borrador.precio(OLAS_ITEM, var), 199.0)
+
+    def test_medidas(self):
+        m = borrador.medidas(OLAS_ITEM, 105.1)
+        self.assertEqual(m["paquete"], {"largo_cm": 20.0, "ancho_cm": 16.0, "alto_cm": 11.0,
+                                        "peso_g": 198.0})
+        self.assertEqual(m["articulo"], {"frente_cm": 8.0, "fondo_cm": 8.0, "alto_cm": 10.0,
+                                         "peso_g": 105.1})
+        item = dict(OLAS_ITEM, attributes=[_attr("LENGTH", "196 mm"), _attr("WIDTH", "7.8 cm"),
+                                           _attr("HEIGHT", "10.2 cm")])
+        a = borrador.medidas(item)["articulo"]
+        self.assertEqual((a["frente_cm"], a["fondo_cm"], a["alto_cm"]), (19.6, 7.8, 10.2))
+
+    def test_precio_original_gana(self):
+        self.assertEqual(borrador.precio(dict(OLAS_ITEM, price=179, original_price=209)), 209.0)
+
+    def test_costo_como_el_catalogo(self):
+        self.assertEqual(borrador.costo(105.1, COSTOS), 33.93)
+        self.assertIsNone(borrador.costo(None, COSTOS))
+
+    def test_pesos_del_catalogo(self):
+        cat = {"a.3mf": {"link": "https://vendedores…/MLM5469890250/modificar", "peso_g": 134.0,
+                         "paquete": 0}, "b.3mf": {"peso_g": 18.0}}
+        self.assertEqual(borrador.pesos_del_catalogo(cat), {"MLM5469890250": (134.0, 0)})
+
+    def test_sku(self):
+        usados = set()
+        a = borrador.sku("PCUB", "Organizador De Cubiertos Olas Negro", "Negro", usados)
+        self.assertEqual(a, "SR-PCUB-OLAS-NEG")
+        usados.add(a)
+        self.assertEqual(borrador.sku("PCUB", "Organizador De Cubiertos Olas Negro", "Negro", usados),
+                         "SR-PCUB-OLAS-NEG-2")
+        # Sin palabra distintiva: los últimos dígitos del MLM, no el color.
+        self.assertEqual(borrador.sku("PCON", "Organizador De Control Remoto Negro", "Negro",
+                                      set(), "MLM5556026256"), "SR-PCON-6256-NEG")
+        self.assertEqual(borrador.sku("PLAP", "Portalapices Moderno Diseño Geometrico negro",
+                                      "Geometrico negro", set()), "SR-PLAP-GEOMETRICO-NEG")
+
+    def test_armar_el_olas(self):
+        pub = {"5Z-W3LH-N087": {"mlm": "MLM3674350731", "variacion": None}}
+        br = borrador.armar(OLAS_ITEM, OLAS_DESCRIPCION,
+                            self.ctx(publicadas=pub, pesos={"MLM3674350731": (105.1, None)}))
+        self.assertEqual(br["sku"], "5Z-W3LH-N087")
+        self.assertEqual(br["titulo"], "Organizador De Cubiertos Olas Negro")
+        self.assertEqual(br["tipo_producto"], "CADDY")
+        self.assertNotIn("tipo_producto", br["por_revisar"])     # categoría confirmada
+        self.assertEqual(br["atributos"]["brand"], "Generic")
+        self.assertEqual(br["atributos"]["material"], "Plástico")
+        self.assertEqual(br["atributos"]["number_of_compartments"], 3)
+        self.assertEqual(br["costo_ref"], 33.93)
+        self.assertEqual(br["precio"], 209.0)
+        self.assertEqual(len(br["fotos"]["otras"]), 4)
+        self.assertTrue(br["vinetas"][2].startswith("MEDIDAS: 8 cm de frente"))
+        for campo in ("titulo", "vinetas", "precio", "envio", "foto_principal", "medidas"):
+            self.assertIn(campo, br["por_revisar"])
+        self.assertEqual(br["envio"], {"modo": None, "cantidad": None})
+
+    def test_armar_sin_publicar_y_paquete_pesado(self):
+        item = dict(OLAS_ITEM, category_id="MLM455181",
+                    attributes=OLAS_ITEM["attributes"][:-1] + [_attr("SELLER_PACKAGE_WEIGHT", "1.4 kg")])
+        br = borrador.armar(item, OLAS_DESCRIPCION, self.ctx())
+        self.assertEqual(br["sku"], "SR-DECO-OLAS-NEG")
+        self.assertIn("tipo_producto", br["por_revisar"])
+        self.assertTrue(any("1400 g" in a for a in br["avisos"]))
+
+    def test_armar_con_esquema(self):
+        cache = {"tipo": "CADDY", "esquema": {
+            "required": ["brand", "item_name", "item_shape"],
+            "properties": {
+                "brand": {}, "manufacturer": {}, "country_of_origin": {}, "condition_type": {},
+                "supplier_declared_dg_hz_regulation": {}, "color": {}, "item_name": {},
+                "item_shape": {"items": {"properties": {"value": {"enum": ["Ovalada"]}}}},
+                "material": {"items": {"properties": {"value": {"anyOf": [
+                    {"type": "string"}, {"enum": ["Plástico", "Metal"]}]}}}}}}}
+        br = borrador.armar(OLAS_ITEM, OLAS_DESCRIPCION, self.ctx(esquema=cache))
+        self.assertNotIn("number_of_compartments", br["atributos"])   # el tipo no lo tiene
+        self.assertIsNone(br["atributos"]["item_shape"])
+        self.assertIn("atributo:item_shape", br["por_revisar"])
+        self.assertNotIn("item_name", br["atributos"])               # lo pone payload()
+
+
 if __name__ == "__main__":
     unittest.main()
