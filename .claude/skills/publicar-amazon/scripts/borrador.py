@@ -671,6 +671,10 @@ def payload(br, cache=None):
         poner("purchasable_offer", oferta)
         if _tiene(cache, "list_price"):
             poner("list_price", {"currency": MONEDA, "value_with_tax": br["precio"]})
+        # Seller Central lo pone en las publicaciones hechas a mano (el Olas):
+        # «no te saltes la oferta».
+        if _tiene(cache, "skip_offer"):
+            poner("skip_offer", False)
 
     envio = br.get("envio") or {}
     if envio.get("modo") == "FBA":

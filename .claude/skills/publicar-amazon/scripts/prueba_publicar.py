@@ -692,6 +692,7 @@ class Payload(unittest.TestCase):
         self.assertIn("other_product_image_locator_4", p["attributes"])
         self.assertEqual(p["attributes"]["purchasable_offer"][0]["our_price"],
                          [{"schedule": [{"value_with_tax": 209.0}]}])
+        self.assertEqual(p["attributes"]["skip_offer"][0]["value"], False)
 
     def test_language_tag_segun_esquema(self):
         cache = {"esquema": {"properties": {
