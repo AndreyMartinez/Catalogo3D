@@ -23,6 +23,7 @@ python3 $S/publicar.py aprobar MLM123 titulo precio …
 python3 $S/publicar.py validar MLM123           # vista previa en Amazon, no crea nada
 python3 $S/publicar.py publicar MLM123          # solo muestra el resumen
 python3 $S/publicar.py publicar MLM123 --confirmo <SKU>   # publica de verdad
+python3 $S/publicar.py activar MLM123 --confirmo <SKU>   # reenvía la oferta ya con ASIN
 python3 $S/publicar.py estado MLM123            # ASIN, estado, issues
 python3 $S/publicar.py comparar MLM123          # Amazon hoy vs borrador
 ```
@@ -80,8 +81,10 @@ existe.
   sin `skip_offer` y quedaron `DISCOVERABLE` sin oferta aunque traían precio
   y piezas. Los que recibieron `skip_offer: false` (por PATCH junto con
   `purchasable_offer` y `fulfillment_availability`, o al «Guardar y
-  finalizar» en Seller Central) pasaron a `BUYABLE` en minutos. `payload()`
-  ya lo manda desde el principio. La API (`estado`) tarda más que Seller
+  finalizar» en Seller Central) pasaron a `BUYABLE` en minutos. Mandarlo en
+  el PUT inicial **no basta** (los 6 portacubiertos lo traían y siguieron sin
+  oferta): cuando ya tenga ASIN, corre `activar <clave>` y, con el mismo «sí»
+  de esa publicación, `activar <clave> --confirmo <SKU>`. La API (`estado`) tarda más que Seller
   Central en mostrar la oferta: manda lo que diga Seller Central.
 - **El ASIN puede cambiar** después de un PATCH (el Olas pasó de B0HP8CH8LT a
   B0HPDXMY67 al corregir el color). `estado` actualiza `publicadas.json`.

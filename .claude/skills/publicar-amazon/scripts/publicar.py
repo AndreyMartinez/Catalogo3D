@@ -13,6 +13,7 @@ en ~/.catalogo3d/amazon/borradores/. El flujo:
   estado MLM…                 ASIN, estado e issues de lo publicado
   publicar MLM [--confirmo SKU] [--campos a,b]
                               publica de verdad; sin --confirmo solo muestra
+  activar MLM [--confirmo SKU] reenvía la oferta cuando ya hay ASIN
 
 MLM… acepta MLM123 o MLM123-<variación>.
 """
@@ -616,6 +617,46 @@ def cmd_publicar(args):
     return 0 if r.get("status") == "ACCEPTED" else 1
 
 
+CAMPOS_OFERTA = ("skip_offer", "purchasable_offer", "fulfillment_availability")
+
+
+def cmd_activar(args):
+    """Reenvía la oferta (precio, piezas, skip_offer) de un SKU ya creado.
+    Los publicados por PUT quedan DISCOVERABLE sin oferta hasta que la oferta
+    se manda otra vez cuando el ASIN ya existe (2026-10-27: 10 portacontroles
+    y 6 portacubiertos)."""
+    clave = args.clave.upper()
+    br = leer_borrador(clave)
+    sku_ = br["sku"]
+    if args.confirmo is not None and args.confirmo != sku_:
+        raise ErrorPublicador(f"--confirmo {args.confirmo} no es el SKU de {clave} ({sku_}). "
+                              "No se mandó nada.")
+    if not leer_listing(sku_, ("summaries",)):
+        raise ErrorPublicador(f"{sku_} no existe en Amazon todavía: publícalo primero.")
+    atributos = borrador.payload(br, esquema.esquema(br["tipo_producto"]))["attributes"]
+    faltan = [c for c in CAMPOS_OFERTA if c not in atributos]
+    if faltan:
+        raise ErrorPublicador(f"El borrador no trae {', '.join(faltan)} (¿precio o envío vacíos?).")
+    parche = {"productType": br["tipo_producto"], "patches": [
+        {"op": "replace", "path": f"/attributes/{c}", "value": atributos[c]} for c in CAMPOS_OFERTA]}
+    params = {"marketplaceIds": [sp_api.MARKETPLACE], "includedData": ["issues"],
+              "issueLocale": sp_api.LOCALE}
+    previa = sp_api.pedir("PATCH", _ruta_sku(sku_), dict(params, mode="VALIDATION_PREVIEW"), parche)
+    e = br.get("envio") or {}
+    print(f"{sku_}: oferta ${br.get('precio')} · {e.get('modo')} {e.get('cantidad') or ''} → "
+          f"vista previa {previa.get('status')}")
+    imprimir_issues(previa.get("issues") or [])
+    if previa.get("status") != "VALID":
+        return 1
+    if not _confirmado(args, sku_):
+        print(f"No se mandó. Para activarla: activar {clave} --confirmo {sku_}")
+        return 0
+    r = sp_api.pedir("PATCH", _ruta_sku(sku_), params, parche)
+    print(f"Amazon respondió: {r.get('status')}")
+    imprimir_issues(r.get("issues") or [])
+    return 0 if r.get("status") == "ACCEPTED" else 1
+
+
 # ------------------------------------------------------------------ main
 
 def parser():
@@ -645,6 +686,10 @@ def parser():
                    help="el SKU exacto; solo después del «sí» del usuario a esta publicación")
     p.add_argument("--campos", help="si el SKU ya existe: atributos a actualizar, separados por coma")
     p.set_defaults(fn=cmd_publicar)
+    p = sub.add_parser("activar", help="reenvía la oferta de un SKU ya creado (pide --confirmo SKU)")
+    p.add_argument("clave")
+    p.add_argument("--confirmo", metavar="SKU")
+    p.set_defaults(fn=cmd_activar)
     return ap
 
 

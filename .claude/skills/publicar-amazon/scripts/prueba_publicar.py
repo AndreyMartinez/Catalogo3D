@@ -1102,6 +1102,17 @@ class Publicar(Comandos):
                                 "--confirmo", "SR-PCUB-OLAS-NEG")
         self.assertEqual((codigo, self.escrituras()), (0, ["PATCH"]))
 
+    def test_activar(self):
+        br = self.listo()
+        self.existe = {"color": [{"value": "Negro"}]}
+        codigo, texto = self.correr("activar", "MLM3674350731")
+        self.assertEqual((codigo, self.escrituras()), (0, []))
+        codigo, _ = self.correr("activar", "MLM3674350731", "--confirmo", br["sku"])
+        self.assertEqual((codigo, self.escrituras()), (0, ["PATCH"]))
+        self.llamadas.clear()
+        codigo, _ = self.correr("activar", "MLM3674350731", "--confirmo", "OTRO")
+        self.assertEqual((codigo, self.llamadas), (1, []))
+
     def test_campo_que_el_borrador_no_tiene(self):
         self.existe = {"capacity": [{"value": 2.5}]}
         codigo, texto = self.correr("publicar", "MLM3674350731", "--campos", "capacity",
