@@ -91,5 +91,24 @@
       "confirmado": false
     }
   },
-  "_comentario_atributos": "'atributos' por categoría se suman a cada borrador nuevo (nombres de Amazon). Los de portacontroles se aplicaron a los 9 publicados el 2026-10-27."
+  "_comentario_atributos": "'atributos' por categoría se suman a cada borrador nuevo (nombres de Amazon). Los de portacontroles se aplicaron a los 9 publicados el 2026-10-27.",
+  "precios": {
+    "_comentario": "Aprobado por el usuario el 2026-10-27. minimo/maximo: límites de Amazon (minimum/maximum_seller_allowed_price). escalones_b2b: [piezas, descuento] para Amazon Business; ningún escalón baja del mínimo.",
+    "minimo": 159,
+    "maximo": 259,
+    "escalones_b2b": [
+      [
+        5,
+        0.1
+      ],
+      [
+        10,
+        0.15
+      ],
+      [
+        25,
+        0.2
+      ]
+    ]
+  }
 }

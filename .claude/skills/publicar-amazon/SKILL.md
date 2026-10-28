@@ -24,6 +24,7 @@ python3 $S/publicar.py validar MLM123           # vista previa en Amazon, no cre
 python3 $S/publicar.py publicar MLM123          # solo muestra el resumen
 python3 $S/publicar.py publicar MLM123 --confirmo <SKU>   # publica de verdad
 python3 $S/publicar.py activar MLM123 --confirmo <SKU>   # reenvía la oferta ya con ASIN
+python3 $S/publicar.py precios MLM123 --confirmo <SKU>   # mínimo/máximo y precios para empresas
 python3 $S/publicar.py estado MLM123            # ASIN, estado, issues
 python3 $S/publicar.py comparar MLM123          # Amazon hoy vs borrador
 ```
@@ -90,6 +91,24 @@ existe.
   Amazon lo oculta de las búsquedas con el issue 18320 («Falta la imagen
   principal»). Se arregla reenviando las mismas fotos (`*_image_locator`) por
   PATCH. Después de cualquier `--campos`, revisa `estado` a la hora.
+
+## Precios
+
+`categorias.json` → `precios` (aprobado el 2026-10-27): mínimo $159 y máximo
+$259 por pieza (Amazon nunca vende fuera de ese rango) y escalones para
+empresas (Amazon Business): 5+ −10 %, 10+ −15 %, 25+ −20 %, nunca debajo del
+mínimo. Cada borrador nuevo los copia; `payload()` arma la oferta al público
+y la de empresas.
+
+```bash
+python3 $S/publicar.py precios MLM123                    # vista previa
+python3 $S/publicar.py precios MLM123 --confirmo <SKU>   # con el «sí» del usuario
+```
+
+Solo toca `purchasable_offer` y conserva lo que Amazon ya tenga en la oferta
+(p. ej. la regla de precio automático del Olas). Comisión de Amazon en
+Hogar y Cocina: 15 % del precio sin IVA ($27.03 en $209, medido con la API de
+tarifas). El costo de Envíos Fáciles todavía no está medido.
 
 ## Corregir una publicación que ya existe
 

@@ -571,6 +571,8 @@ def armar(item, texto_descripcion, ctx, variacion=None):
         "medidas": med,
         "fotos": {"principal": principal, "otras": otras, "excluidas": []},
         "precio": precio(item, variacion),
+        "precios": conf.get("precios") and {k: v for k, v in conf["precios"].items()
+                                             if not k.startswith("_")},
         "costo_ref": costo(peso, ctx.get("costos"), paquete_costo),
         "envio": {"modo": None, "cantidad": None},
         "por_revisar": por_revisar,
@@ -603,7 +605,8 @@ LOCALE = "es_MX"
 MONEDA = "MXN"
 # Campos del borrador que cambian lo que se manda; la huella sale de ellos.
 CAMPOS_CONTENIDO = ("sku", "tipo_producto", "titulo", "vinetas", "descripcion",
-                    "palabras_clave", "atributos", "medidas", "fotos", "precio", "envio")
+                    "palabras_clave", "atributos", "medidas", "fotos", "precio", "precios",
+                    "envio")
 
 
 class ErrorBorrador(Exception):
@@ -667,11 +670,8 @@ def payload(br, cache=None):
         poner(f"other_product_image_locator_{i}", {"media_location": url})
 
     if br.get("precio"):
-        oferta = {"currency": MONEDA,
-                  "our_price": [{"schedule": [{"value_with_tax": br["precio"]}]}]}
-        if "audience" in _subcampos(cache, "purchasable_offer"):
-            oferta["audience"] = "ALL"
-        poner("purchasable_offer", oferta)
+        con_audiencia = cache is None or "audience" in _subcampos(cache, "purchasable_offer")
+        poner("purchasable_offer", ofertas(br["precio"], br.get("precios"), con_audiencia))
         if _tiene(cache, "list_price"):
             poner("list_price", {"currency": MONEDA, "value_with_tax": br["precio"]})
         # Seller Central lo pone en las publicaciones hechas a mano (el Olas):
@@ -721,6 +721,44 @@ def payload(br, cache=None):
 
     return {"productType": br["tipo_producto"], "requirements": "LISTING",
             "attributes": attrs}
+
+
+def _precio(valor):
+    return [{"schedule": [{"value_with_tax": valor}]}]
+
+
+def escalones(precio, reglas):
+    """[(piezas, precio por pieza)] para empresas: cada escalón es el precio
+    con su descuento, redondeado a pesos y nunca debajo del mínimo."""
+    minimo = (reglas or {}).get("minimo") or 0
+    return [(int(piezas), max(minimo, round(precio * (1 - desc))))
+            for piezas, desc in (reglas or {}).get("escalones_b2b") or []]
+
+
+def ofertas(precio, reglas=None, con_audiencia=True):
+    """purchasable_offer: la oferta al público (con límites mínimo y máximo si
+    hay reglas) y, si hay escalones, la de empresas (Amazon Business) con
+    descuento por volumen."""
+    reglas = reglas or {}
+    publico = {"currency": MONEDA, "our_price": _precio(precio)}
+    if con_audiencia:
+        publico["audience"] = "ALL"
+    if reglas.get("minimo"):
+        if precio < reglas["minimo"]:
+            raise ErrorBorrador(f"El precio ${precio:g} está debajo del mínimo ${reglas['minimo']:g}.")
+        publico["minimum_seller_allowed_price"] = _precio(reglas["minimo"])
+    if reglas.get("maximo"):
+        if precio > reglas["maximo"]:
+            raise ErrorBorrador(f"El precio ${precio:g} está arriba del máximo ${reglas['maximo']:g}.")
+        publico["maximum_seller_allowed_price"] = _precio(reglas["maximo"])
+    salida = [publico]
+    niveles = escalones(precio, reglas)
+    if niveles and con_audiencia:
+        salida.append({"currency": MONEDA, "audience": "B2B", "our_price": _precio(precio),
+                       "quantity_discount_plan": [{"schedule": [{
+                           "discount_type": "fixed",
+                           "levels": [{"lower_bound": n, "value": float(v)} for n, v in niveles]}]}]})
+    return salida
 
 
 def huella(br):

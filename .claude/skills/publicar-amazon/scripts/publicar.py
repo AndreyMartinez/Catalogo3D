@@ -14,6 +14,7 @@ en ~/.catalogo3d/amazon/borradores/. El flujo:
   publicar MLM [--confirmo SKU] [--campos a,b]
                               publica de verdad; sin --confirmo solo muestra
   activar MLM [--confirmo SKU] reenvía la oferta cuando ya hay ASIN
+  precios MLM [--confirmo SKU] precio, mínimo/máximo y escalones para empresas
 
 MLM… acepta MLM123 o MLM123-<variación>.
 """
@@ -659,6 +660,60 @@ def cmd_activar(args):
     return 0 if r.get("status") == "ACCEPTED" else 1
 
 
+def combinar_ofertas(actuales, nuevas):
+    """Las ofertas nuevas, conservando de cada oferta actual (misma audiencia)
+    lo que el borrador no maneja, como la regla de precio automático que
+    Seller Central le puso al Olas."""
+    por_audiencia = {(o.get("audience") or "ALL"): o for o in actuales or []}
+    salida = []
+    for nueva in nuevas:
+        vieja = por_audiencia.get(nueva.get("audience") or "ALL", {})
+        salida.append({**{k: v for k, v in vieja.items() if k not in nueva}, **nueva})
+    return salida
+
+
+def cmd_precios(args):
+    """Sube el precio, los límites mínimo/máximo y los escalones para empresas
+    de categorias.json a un SKU ya publicado (solo purchasable_offer)."""
+    clave = args.clave.upper()
+    br = leer_borrador(clave)
+    sku_ = br["sku"]
+    if args.confirmo is not None and args.confirmo != sku_:
+        raise ErrorPublicador(f"--confirmo {args.confirmo} no es el SKU de {clave} ({sku_}). "
+                              "No se mandó nada.")
+    conf = leer_json(CATEGORIAS)
+    br["precios"] = {k: v for k, v in (conf.get("precios") or {}).items() if not k.startswith("_")}
+    actual = leer_listing(sku_, ("attributes",))
+    if actual is None:
+        raise ErrorPublicador(f"{sku_} no existe en Amazon todavía: publícalo primero.")
+    cache = esquema.esquema(br["tipo_producto"])
+    nuevas = borrador.payload(br, cache)["attributes"]["purchasable_offer"]
+    oferta = combinar_ofertas((actual.get("attributes") or {}).get("purchasable_offer"), nuevas)
+    parche = {"productType": br["tipo_producto"], "patches": [
+        {"op": "replace", "path": "/attributes/purchasable_offer", "value": oferta}]}
+    params = {"marketplaceIds": [sp_api.MARKETPLACE], "includedData": ["issues"],
+              "issueLocale": sp_api.LOCALE}
+    niveles = borrador.escalones(br["precio"], br["precios"])
+    print(f"{sku_}: ${br['precio']:g} (mín ${br['precios'].get('minimo')}, máx "
+          f"${br['precios'].get('maximo')}) · empresas "
+          + ", ".join(f"{n}+ ${v}" for n, v in niveles))
+    previa = sp_api.pedir("PATCH", _ruta_sku(sku_), dict(params, mode="VALIDATION_PREVIEW"), parche)
+    print(f"  vista previa {previa.get('status')}")
+    imprimir_issues(previa.get("issues") or [])
+    if previa.get("status") != "VALID":
+        return 1
+    if not _confirmado(args, sku_):
+        print(f"  No se mandó. Para subirlos: precios {clave} --confirmo {sku_}")
+        return 0
+    r = sp_api.pedir("PATCH", _ruta_sku(sku_), params, parche)
+    print(f"  Amazon respondió: {r.get('status')}")
+    imprimir_issues(r.get("issues") or [])
+    if r.get("status") == "ACCEPTED":
+        guardar_privado(ruta_borrador(clave), br)
+        return 0
+    return 1
+
+
 # ------------------------------------------------------------------ main
 
 def parser():
@@ -692,6 +747,10 @@ def parser():
     p.add_argument("clave")
     p.add_argument("--confirmo", metavar="SKU")
     p.set_defaults(fn=cmd_activar)
+    p = sub.add_parser("precios", help="sube precio, límites y escalones para empresas (pide --confirmo SKU)")
+    p.add_argument("clave")
+    p.add_argument("--confirmo", metavar="SKU")
+    p.set_defaults(fn=cmd_precios)
     return ap
 
 

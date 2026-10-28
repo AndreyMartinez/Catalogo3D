@@ -1121,5 +1121,49 @@ class Publicar(Comandos):
         self.assertEqual(self.escrituras(), [])
 
 
+# ----------------------------------------------------------------- precios
+
+class Precios(unittest.TestCase):
+    REGLAS = {"minimo": 159, "maximo": 259, "escalones_b2b": [[5, 0.10], [10, 0.15], [25, 0.20]]}
+
+    def test_escalones(self):
+        self.assertEqual(borrador.escalones(209, self.REGLAS), [(5, 188), (10, 178), (25, 167)])
+        # Nunca debajo del mínimo: 198 × 0.8 = 158.4 → 159.
+        self.assertEqual(borrador.escalones(198, self.REGLAS)[-1], (25, 159))
+
+    def test_ofertas(self):
+        publico, empresas = borrador.ofertas(209, self.REGLAS)
+        self.assertEqual(publico["audience"], "ALL")
+        self.assertEqual(publico["minimum_seller_allowed_price"], [{"schedule": [{"value_with_tax": 159}]}])
+        self.assertEqual(publico["maximum_seller_allowed_price"], [{"schedule": [{"value_with_tax": 259}]}])
+        self.assertEqual(empresas["audience"], "B2B")
+        niveles = empresas["quantity_discount_plan"][0]["schedule"][0]["levels"]
+        self.assertEqual(niveles[0], {"lower_bound": 5, "value": 188.0})
+        self.assertEqual(len(borrador.ofertas(209)), 1)          # sin reglas: solo público
+
+    def test_precio_fuera_de_limites(self):
+        with self.assertRaises(borrador.ErrorBorrador):
+            borrador.ofertas(149, self.REGLAS)
+        with self.assertRaises(borrador.ErrorBorrador):
+            borrador.ofertas(299, self.REGLAS)
+
+    def test_payload_con_precios(self):
+        br = borrador.armar(OLAS_ITEM, OLAS_DESCRIPCION, {"categorias": CATEGORIAS})
+        self.assertEqual(br["precios"]["minimo"], 159)
+        po = borrador.payload(br)["attributes"]["purchasable_offer"]
+        self.assertEqual([o["audience"] for o in po], ["ALL", "B2B"])
+        self.assertTrue(all(o["marketplace_id"] == "A1AM78C64UM0Y8" for o in po))
+
+    def test_combinar_conserva_lo_de_amazon(self):
+        actuales = [{"audience": "ALL", "currency": "MXN", "our_price": [1],
+                     "automated_pricing_merchandising_rule_plan": ["regla"]},
+                    {"audience": "B2B", "quantity_discount_plan": ["viejo"]}]
+        nuevas = borrador.ofertas(209, self.REGLAS)
+        c = publicar.combinar_ofertas(actuales, nuevas)
+        self.assertEqual(c[0]["automated_pricing_merchandising_rule_plan"], ["regla"])
+        self.assertEqual(c[0]["our_price"], [{"schedule": [{"value_with_tax": 209}]}])
+        self.assertNotEqual(c[1]["quantity_discount_plan"], ["viejo"])
+
+
 if __name__ == "__main__":
     unittest.main()
