@@ -1,0 +1,114 @@
+{
+  "_comentario": "Categoría de MercadoLibre → tipo de producto de Amazon México y clave de SKU. Sin datos del negocio: se versiona. 'confirmado' lo pone el usuario después de ver el tipo en un borrador.",
+  "marca": "Generic",
+  "fabricante": "Genérico",
+  "categorias": {
+    "MLM190943": {
+      "nombre": "Organizadores de cubiertos",
+      "clave_sku": "PCUB",
+      "tipo_producto": "CADDY",
+      "confirmado": true,
+      "atributos": {
+        "recommended_browse_nodes": "9725275011",
+        "material": "Plástico",
+        "special_feature": [
+          "Compartimentado",
+          "Ligero"
+        ],
+        "specific_uses_for_product": [
+          "Utensilios",
+          "Utensilios de cocina"
+        ],
+        "mounting_type": "Montaje en mesa",
+        "finish_type": "Mate",
+        "style": "Moderno",
+        "number_of_packs": 1
+      }
+    },
+    "MLM194377": {
+      "nombre": "Portacontroles",
+      "clave_sku": "PCON",
+      "tipo_producto": "CADDY",
+      "confirmado": true,
+      "atributos": {
+        "recommended_browse_nodes": "50603088011",
+        "material": "Plástico",
+        "special_feature": [
+          "Compartimentado",
+          "Ligero",
+          "Compacto"
+        ],
+        "specific_uses_for_product": [
+          "Dispositivos electrónicos portátiles"
+        ],
+        "mounting_type": "Montaje en mesa",
+        "finish_type": "Mate",
+        "style": "Moderno",
+        "number_of_packs": 1
+      }
+    },
+    "MLM191167": {
+      "nombre": "Portalápices y organizadores de escritorio",
+      "clave_sku": "PLAP",
+      "tipo_producto": "CADDY",
+      "confirmado": false
+    },
+    "MLM189301": {
+      "nombre": "Portacepillos",
+      "clave_sku": "PCEP",
+      "tipo_producto": "TOOTHBRUSH_HOLDER",
+      "confirmado": false,
+      "nota": "TOOTHBRUSH_HOLDER no acepta la exención de GTIN con marca Generic (8560, 2026-10-27); como CADDY sí pasa. Pendiente de decidir; no publicar todavía."
+    },
+    "MLM151406": {
+      "nombre": "Floreros",
+      "clave_sku": "FLOR",
+      "tipo_producto": "VASE",
+      "confirmado": false
+    },
+    "MLM187846": {
+      "nombre": "Macetas",
+      "clave_sku": "MACE",
+      "tipo_producto": "PLANTER",
+      "confirmado": false
+    },
+    "MLM189696": {
+      "nombre": "Esculturas",
+      "clave_sku": "ESCU",
+      "tipo_producto": "SCULPTURE",
+      "confirmado": false
+    },
+    "MLM455181": {
+      "nombre": "Decoración",
+      "clave_sku": "DECO",
+      "tipo_producto": "SCULPTURE",
+      "confirmado": false
+    },
+    "MLM191613": {
+      "nombre": "Organizadores de fregadero",
+      "clave_sku": "FREG",
+      "tipo_producto": "SOAP_DISH",
+      "confirmado": false
+    }
+  },
+  "_comentario_atributos": "'atributos' por categoría se suman a cada borrador nuevo (nombres de Amazon). Los de portacontroles se aplicaron a los 9 publicados el 2026-10-27.",
+  "precios": {
+    "_comentario": "Aprobado por el usuario el 2026-10-27. minimo/maximo: límites de Amazon (minimum/maximum_seller_allowed_price). escalones_b2b: [piezas, descuento] para Amazon Business; ningún escalón baja del mínimo.",
+    "minimo": 159,
+    "maximo": 259,
+    "escalones_b2b": [
+      [
+        5,
+        0.1
+      ],
+      [
+        10,
+        0.15
+      ],
+      [
+        25,
+        0.2
+      ]
+    ]
+  }
+}
