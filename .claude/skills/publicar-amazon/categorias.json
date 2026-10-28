@@ -7,7 +7,23 @@
       "nombre": "Organizadores de cubiertos",
       "clave_sku": "PCUB",
       "tipo_producto": "CADDY",
-      "confirmado": true
+      "confirmado": true,
+      "atributos": {
+        "recommended_browse_nodes": "9725275011",
+        "material": "Plástico",
+        "special_feature": [
+          "Compartimentado",
+          "Ligero"
+        ],
+        "specific_uses_for_product": [
+          "Utensilios",
+          "Utensilios de cocina"
+        ],
+        "mounting_type": "Montaje en mesa",
+        "finish_type": "Mate",
+        "style": "Moderno",
+        "number_of_packs": 1
+      }
     },
     "MLM194377": {
       "nombre": "Portacontroles",
