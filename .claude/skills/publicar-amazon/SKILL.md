@@ -77,17 +77,19 @@ existe.
 
 ## Después de publicar
 
-- **«Falta la oferta»**: los 10 portacontroles del 2026-10-27 se publicaron
-  sin `skip_offer` y quedaron `DISCOVERABLE` sin oferta aunque traían precio
-  y piezas. Los que recibieron `skip_offer: false` (por PATCH junto con
-  `purchasable_offer` y `fulfillment_availability`, o al «Guardar y
-  finalizar» en Seller Central) pasaron a `BUYABLE` en minutos. Mandarlo en
-  el PUT inicial **no basta** (los 6 portacubiertos lo traían y siguieron sin
-  oferta): cuando ya tenga ASIN, corre `activar <clave>` y, con el mismo «sí»
-  de esa publicación, `activar <clave> --confirmo <SKU>`. La API (`estado`) tarda más que Seller
-  Central en mostrar la oferta: manda lo que diga Seller Central.
+- **«Falta la oferta»**: todo SKU creado por PUT queda `DISCOVERABLE` sin
+  oferta aunque traiga precio, piezas y `skip_offer: false`. El 2026-10-27
+  los 10 portacontroles y los 6 portacubiertos se activaron (`BUYABLE`) entre
+  15 minutos y 1 hora después de reenviarles la oferta con `activar`, o de
+  «Guardar y finalizar» en Seller Central. No está claro si lo activa el
+  reenvío o solo el tiempo. Regla práctica: espera una hora; si sigue igual,
+  `activar <clave> --confirmo <SKU>` (con el «sí» de esa publicación) o
+  guardarla en Seller Central.
 - **El ASIN puede cambiar** después de un PATCH (el Olas pasó de B0HP8CH8LT a
-  B0HPDXMY67 al corregir el color). `estado` actualiza `publicadas.json`.
+  B0HPDXMY67 al corregir el color) y **el ASIN nuevo puede quedar sin fotos**:
+  Amazon lo oculta de las búsquedas con el issue 18320 («Falta la imagen
+  principal»). Se arregla reenviando las mismas fotos (`*_image_locator`) por
+  PATCH. Después de cualquier `--campos`, revisa `estado` a la hora.
 
 ## Corregir una publicación que ya existe
 
