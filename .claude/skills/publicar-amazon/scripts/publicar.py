@@ -634,11 +634,13 @@ def cmd_activar(args):
     if not leer_listing(sku_, ("summaries",)):
         raise ErrorPublicador(f"{sku_} no existe en Amazon todavía: publícalo primero.")
     atributos = borrador.payload(br, esquema.esquema(br["tipo_producto"]))["attributes"]
-    faltan = [c for c in CAMPOS_OFERTA if c not in atributos]
+    faltan = [c for c in CAMPOS_OFERTA[1:] if c not in atributos]
     if faltan:
         raise ErrorPublicador(f"El borrador no trae {', '.join(faltan)} (¿precio o envío vacíos?).")
+    # skip_offer solo si el tipo de producto lo tiene.
     parche = {"productType": br["tipo_producto"], "patches": [
-        {"op": "replace", "path": f"/attributes/{c}", "value": atributos[c]} for c in CAMPOS_OFERTA]}
+        {"op": "replace", "path": f"/attributes/{c}", "value": atributos[c]}
+        for c in CAMPOS_OFERTA if c in atributos]}
     params = {"marketplaceIds": [sp_api.MARKETPLACE], "includedData": ["issues"],
               "issueLocale": sp_api.LOCALE}
     previa = sp_api.pedir("PATCH", _ruta_sku(sku_), dict(params, mode="VALIDATION_PREVIEW"), parche)
