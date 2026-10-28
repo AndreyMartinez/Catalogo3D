@@ -331,13 +331,19 @@ def guardar(pieza, ruta, nombre, png, notas, parametros):
     dx, dy = 128.0 - (x0 + x1) / 2.0, 128.0 - (y0 + y1) / 2.0
     exportar.guardar_3mf([("pieza", pieza, dx, dy)], ruta, nombre,
                          miniatura=png, notas=notas, parametros=parametros)
+    aplicar_perfil(ruta, LAMINADO)
+
+
+def aplicar_perfil(ruta, laminado):
+    """Mete en el 3MF el perfil de la casa (AJUSTES) con los cambios de
+    `laminado`, para que Bambu Studio y su CLI lo laminen igual."""
     if not AJUSTES.exists():
         return
     with zipfile.ZipFile(AJUSTES) as z:
         cfg = json.loads(z.read("Metadata/project_settings.config"))
-    cfg.update(LAMINADO)
+    cfg.update(laminado)
     dif = cfg.get("different_settings_to_system") or [""]
-    dif[0] = ";".join(sorted(set(filter(None, dif[0].split(";"))) | set(LAMINADO)))
+    dif[0] = ";".join(sorted(set(filter(None, dif[0].split(";"))) | set(laminado)))
     cfg["different_settings_to_system"] = dif
     with zipfile.ZipFile(ruta) as z:
         todo = {n: z.read(n) for n in z.namelist()}

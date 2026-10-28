@@ -3,7 +3,7 @@
 Archivo: `own design 3d/Pruebas de productos/Portacubiertos_Trenzado.3mf` (+ `.png`, `.stl`)
 Origen: **generador propio**, `generadores/portacubiertos_trenzado.py`, a partir de una
 foto de referencia (10-22): tres vasos color nogal de costillas en espiral, caladas,
-dentro de una bandeja beige. Cuatro piezas: 3 vasos + bandeja (dos colores posibles).
+dentro de una bandeja beige. Desde la v10: 2 vasos + bandeja (`--vasos 3` rehace el de la foto).
 
     python3 generadores/portacubiertos_trenzado.py --salida "<carpeta>"
 
@@ -114,11 +114,29 @@ Juego completo (CLI), costo = g × 167 $/kg + $16.38:
 La paquetería ($16.38, con maceta de regalo y tierra) es el 27 % del costo; no se tocó.
 Si al imprimir la v9 aguanta bien, B queda como siguiente paso (probar uno antes de vender).
 
+## v10 (10-23) — 2 vasos para la caja de 20 × 16 × 11
+Pedido: «¿cabe en la caja?» → no: la bandeja de 3 vasos mide 25.2 cm y ni inclinada entra
+(le faltan ~16 mm por lado en su mejor giro). «Déjalo de solo 2 espacios… que ocupe los
+20 de largo sin problema». Aprobado con el precheck («sí»). Respaldo: `.v9.bak`.
+
+- Bandeja de n lóbulos (`lobulos`, `BANDEJA["vasos"]` = 2) y `largo` = 196 mm: los vasos
+  se ensanchan parejo hasta llenarlo (`ajustar_al_largo`): radios 35.8 / 46.2 / 33.5
+  (piso / panza / boca), **92 × 100 mm**, mismo alto; costillas 14 → **16** para que cada
+  una siga del mismo ancho. Separación, holgura, pared, labio y alturas sin cambio.
+- Juego armado **195.9 × 100.9 × 103.1 mm**: entra derecho en la caja de 20 × 16 × 11
+  (4 mm de sobra a lo largo, 7 arriba). Un juego por plato P2S.
+- Con `--vasos 3 --largo 0` sale idéntico a la v9.
+
+| Juego (CLI) | Tiempo | Peso | Costo |
+|---|---|---|---|
+| v9 (3 vasos, no cabe en la caja) | 8 h 14 | 263.0 g | $60.30 |
+| **v10 (2 vasos 92 × 100)** | **6 h 33** | **211.8 g** | **$51.75** |
+
 ## Pendiente / conocido
 - **Imprimir** el juego y revisar las costillas (sin z-hop se ahorrarían 17 min por vaso,
   51 por juego, pero la boquilla podría raspar las costillas: no se aplicó).
-- **Vaso** 49.3 g laminado (la suma de sólidos del script da 60.8, sobreestima).
-- El tiempo lo mandan los vasos (3 × 2 h 03 de 8 h 14), sobre todo los trayectos entre
-  costillas.
+- Vaso de 80 mm (v9) 49.3 g laminado; la suma de sólidos del script sobreestima.
+- Holgura justa en la caja (4 mm): si el burbuja no deja cerrar, `--largo 190`.
+- El tiempo lo mandan los vasos, sobre todo los trayectos entre costillas.
 - Rendijas de 2.2 mm: la punta de cuchillos o tenedores podría atorarse; el usuario
   eligió dejarlas así.
