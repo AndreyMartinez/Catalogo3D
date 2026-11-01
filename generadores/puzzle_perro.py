@@ -27,7 +27,7 @@ from nucleo import exportar, malla as M, render   # noqa: E402
 
 DENSIDAD_PETG = 1.27
 CENTRO_PLATO = 128.0
-AJUSTES = Path.home() / "Desktop" / "own design 3d" / "General_Vases_print_profile(5).3mf"
+AJUSTES = Path.home() / "Desktop" / "own design 3d" / "Florero Minimalista Grande 178mm.3mf"
 # Pieza maciza: perímetros y relleno normales, no los del florero.
 LAMINADO = {"resolution": "0.05", "wall_loops": "2", "sparse_infill_density": "12%",
             "top_shell_layers": "5", "bottom_shell_layers": "4", "spiral_mode": "0"}
