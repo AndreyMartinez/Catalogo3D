@@ -383,7 +383,7 @@ def charola(p):
 # pared 1.6 y 2 vueltas (4 hilos de 0.42) el plato salía en 12 h 20: la
 # textura partía la pared en trazos sueltos (4.6 h solo de recorridos).
 AJUSTES_P2S = (Path.home() / "Desktop" / "own design 3d"
-               / "General_Vases_print_profile(5).3mf")
+               / "Florero Minimalista Grande 178mm.3mf")
 LAMINADO = {"sparse_infill_density": "15%", "skeleton_infill_density": "15%",
             "skin_infill_density": "15%", "top_shell_layers": "5",
             "wall_loops": "1", "wall_generator": "arachne",

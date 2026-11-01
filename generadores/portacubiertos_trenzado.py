@@ -351,7 +351,7 @@ def ajustar_al_largo(v, b):
 # Arachne (las costillas de cordón son cáscara curva de 2.4 mm) y resolución
 # 0.05: con 0.012 la malla redonda da tramitos que nunca alcanzan velocidad.
 AJUSTES_P2S = (Path.home() / "Desktop" / "own design 3d"
-               / "General_Vases_print_profile(5).3mf")
+               / "Florero Minimalista Grande 178mm.3mf")
 LAMINADO = {"sparse_infill_density": "15%", "skeleton_infill_density": "15%",
             "skin_infill_density": "15%", "top_shell_layers": "5",
             "wall_generator": "arachne", "resolution": "0.05",
