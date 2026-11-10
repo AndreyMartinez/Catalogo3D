@@ -30,6 +30,7 @@ galería, el motor o un skill, propón `sdd`; si es una tarea puntual, hazla.
 |---|---|---|
 | Producto nuevo y mercado | `producto-nuevo` | Del dato de mercado (ML/Amazon, «+100 vendidos») a 10 propuestas, diseño, prototipo, publicación y seguimiento semanas 2/4/6. Corre con Opus 5.5. |
 | | `estudio-mercado` | Rutina del domingo: ventas de la semana, competencia y el estudio vivo. |
+| | `publicar-amazon` | Copiar las publicaciones de ML a Amazon México por SP-API: borrador, vista previa y publicación con «sí» una por una. |
 | Producción e impresión | `colecta-full` | Cuándo programar la colecta a Full, cuánto mandar y en qué orden imprimir. |
 | | `optimizar-pieza` | Arreglar una pieza puntual: acabado, peso, paredes, bordes. |
 | | `transform` | Paquete completo de mejoras a una pieza: capa, soporte, tamaño, placa llena. |
@@ -56,8 +57,8 @@ galería, el motor o un skill, propón `sdd`; si es una tarea puntual, hazla.
 
 El repo es **público**.
 
-- **Credenciales y tokens de MercadoLibre**: `~/.catalogo3d/` (permisos 600).
-  Nunca se copian al repo, al chat ni a un commit.
+- **Credenciales y tokens de MercadoLibre y Amazon**: `~/.catalogo3d/`
+  (permisos 600). Nunca se copian al repo, al chat ni a un commit.
 - **Ventas y datos del negocio**: `~/.catalogo3d/ml_datos.json`,
   `.claude/mercado/` (estudio vivo y cifras semanales) y
   `.claude/productos/` salvo `investigacion/` — locales, ignorados por git.
