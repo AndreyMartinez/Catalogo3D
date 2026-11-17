@@ -38,9 +38,11 @@ from nucleo import exportar, malla as M, render   # noqa: E402
 DENSIDAD = 1.24          # g/cm³, PLA
 
 P = {
-    "ancho": 126.0,          # 42 + 38.75 + 38.75 por dentro, más pared y tabiques
-    "fondo": 72.5,           # adentro 70: control de panza (~54) a lo hondo
-                             # o dos de ladito (~26 c/u)
+    "ancho": 148.0,          # 46 + 47.7 + 47.8 por dentro, más pared y tabiques
+                             # (v1: 126; v2 11-16, «más anchos y largos», para
+                             # los controles gruesos de las opiniones 1★)
+    "fondo": 90.0,           # adentro 87.5: dos controles de ladito con
+                             # holgura (v1: 72.5); 3 por plato con una girada
     "redondeo": 8.0,         # radio de las esquinas en planta
     "alto": 105.0,           # lado izquierdo
     "alto_bajo": 60.0,       # lado derecho
@@ -62,10 +64,9 @@ P = {
     "piso": 1.6,
     "divisor": 2.0,          # grueso de los divisores
     "baja_divisor": 10.0,    # cuánto quedan los divisores bajo el borde
-    "hueco_1": 42.0,         # celular gordo (~82) recargado en diagonal:
-                             # 42 × 70 da 81.6 de diagonal
-    "hueco_2": 38.75,        # control de panza (~38 de grueso), justo; lo que
-                             # sobra a la derecha, igual
+    "hueco_1": 46.0,         # celular gordo (~82) recargado en diagonal:
+                             # 46 × 87.5 da 98.9 de diagonal
+    "hueco_2": 47.7,         # control grueso; lo que sobra a la derecha, igual
     "alza_1": 8.0,           # cuánto sube el piso de cada compartimento
     "alza_2": 14.0,
     "alza_3": 20.0,
@@ -317,7 +318,41 @@ def divisores(p):
 # ── Salida ────────────────────────────────────────────────────────────────
 
 PLATO = 256.0
-COPIAS = 3               # 3 × 75 de fondo caben a lo ancho del plato
+COPIAS = 3
+SEPARA = 7.0             # entre copias en el plato
+
+
+def girada(m):
+    """La malla girada 90° en planta (x, y) → (−y, x)."""
+    otra = M.Malla()
+    otra.v = [(-y, x, z) for x, y, z in m.v]
+    otra.t = list(m.t)
+    return otra
+
+
+def acomodo(pieza):
+    """Las 3 copias en el plato. Si caben en fila a lo hondo, en fila (v1:
+    3 × 75); si no, dos en fila y la tercera girada a un lado (v2: 150 × 92
+    no cabe 3 en fila, pero 150 + 7 + 92 sí cabe a lo ancho)."""
+    (x0, y0, _), (x1, y1, _) = pieza.caja()
+    largo, fondo = x1 - x0, y1 - y0
+    cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+    if COPIAS * fondo + (COPIAS - 1) * SEPARA <= PLATO - 4:
+        paso = fondo + SEPARA
+        return [("pieza %d" % (i + 1), pieza, PLATO / 2 - cx,
+                 PLATO / 2 - cy + (i - (COPIAS - 1) / 2) * paso)
+                for i in range(COPIAS)]
+    total = largo + SEPARA + fondo
+    assert total <= PLATO - 4 and 2 * fondo + SEPARA <= PLATO - 4 \
+        and largo <= PLATO - 4, "no caben 3 por plato"
+    izq = (PLATO - total) / 2
+    otra = girada(pieza)
+    (gx0, gy0, _), (gx1, gy1, _) = otra.caja()
+    paso = fondo + SEPARA
+    return [("pieza 1", pieza, izq + largo / 2 - cx, PLATO / 2 - cy - paso / 2),
+            ("pieza 2", pieza, izq + largo / 2 - cx, PLATO / 2 - cy + paso / 2),
+            ("pieza 3", otra, PLATO - izq - fondo / 2 - (gx0 + gx1) / 2,
+             PLATO / 2 - (gy0 + gy1) / 2)]
 
 # Perfil rápido de la P2S con Bambu PLA Basic, tomado del Oleaje M: una vuelta
 # Arachne de hilo 0.62, que en el valle de dos hilos se pisa y sale maciza.
@@ -329,7 +364,12 @@ LAMINADO = {"wall_loops": "1", "wall_generator": "arachne",
             "outer_wall_line_width": "0.62", "inner_wall_line_width": "0.62",
             "filter_out_gap_fill": "0", "resolution": "0.05",
             "infill_combination": "1", "sparse_infill_density": "10%",
-            "top_shell_layers": "4"}
+            "top_shell_layers": "4",
+            # v2 (11-16): sin elevación en Z y sin retraer en saltos de menos
+            # de 3 mm (como el florero minimalista), y relleno rayo, que solo
+            # sostiene los techos de las losas: −19 g y −20 min por pieza.
+            "z_hop": "0", "retraction_minimum_travel": "3",
+            "sparse_infill_pattern": "lightning"}
 
 
 def embeber_ajustes(ruta, ajustes):
@@ -338,7 +378,9 @@ def embeber_ajustes(ruta, ajustes):
     Studio ignora los ajustes y lamina con los genéricos."""
     with zipfile.ZipFile(ajustes) as z:
         cfg = json.loads(z.read("Metadata/project_settings.config"))
-    cfg.update(LAMINADO)
+    for k, v in LAMINADO.items():
+        # Las de extrusor (z_hop, retracción) son listas, una por extrusor.
+        cfg[k] = [v] * len(cfg[k]) if isinstance(cfg.get(k), list) else v
     dif = cfg.get("different_settings_to_system") or ["", "", ""]
     dif[0] = ";".join(sorted(set(filter(None, dif[0].split(";"))) | set(LAMINADO)))
     cfg["different_settings_to_system"] = dif
@@ -389,12 +431,7 @@ def main():
     piezas = [("cuerpo", pieza, 0.0, 0.0)]
     exportar.guardar_stl(piezas, ruta.with_suffix(".stl"), a.nombre)
     if a.tres_mf:
-        # Copias en fila a lo ancho del plato, separadas 7 mm.
-        fondo = y1 - y0
-        paso = fondo + 7.0
-        plato = [("pieza %d" % (i + 1), pieza, PLATO / 2,
-                  PLATO / 2 + (i - (COPIAS - 1) / 2) * paso)
-                 for i in range(COPIAS)]
+        plato = acomodo(pieza)
         exportar.guardar_3mf(plato, ruta, a.nombre, miniatura=png,
                              notas="%s · portacontroles · %d por plato"
                              % (a.nombre, COPIAS),

@@ -44,7 +44,46 @@ Costo = g × 167 $/kg + $16.38 de paquetería. Tiempo de la placa: pared exterio
 sólido interno 1.4 h (divisores y techos de las losas), viajes 1.2 h, relleno 0.7 h.
 Como referencia, el portacontroles4espacios v5 da 143.5 g · $40.34.
 
+## 2026-11-16 (v2) — «Puedes hacer estos más anchos y largos y optimizarlos»
+
+Feedback sobre la tarjeta (placa de 3, 300.2 g). Contexto: MLM3713176381 lleva 1 venta
+en W44–W45 (medido, «nueva»), y la queja de la familia son los controles gruesos que no
+caben (memoria portacontroles-mas-grande).
+
+Cambios contra v1 (precheck aprobado 11-16):
+- Planta 126 × 72.5 → **148 × 90** (con relieve 128.4 × 74.9 → **150.4 × 92.4**); alto
+  igual 105 → 60, por la caja 20×16×11 (cabe).
+- Huecos 42 / 38.8 / 38.8 × 70 → **46 / 47.7 / 47.8 × 87.5**; hondo 94 / 67 / 40.
+- Plato: 3 en fila ya no caben (3 × 92.4 + 14 > 256). Ahora van **dos en fila y la
+  tercera girada 90° a un lado** (150.4 + 7 + 92.4 = 249.8). `acomodo()` en el generador
+  escoge solo: en fila si cabe, si no en L.
+- Perfil: `z_hop` 0.4 → **0**, `retraction_minimum_travel` 1 → **3** (como el florero
+  minimalista) y `sparse_infill_pattern` grid → **lightning**: el relleno solo sostiene
+  los techos de las losas del piso, que era el 23 % del filamento.
+
+Variantes laminadas por CLI (Bambu Studio, placa de 3; costo = g × 198 $/kg + $13.96,
+valores de `.catalogo3d_costos.json` al 11-16):
+
+| Versión | Placa de 3 | Por pieza | Peso/pieza | Costo/pieza |
+|---|---|---|---|---|
+| v1 128 × 75 | 7 h 59 · 300.2 g | 2 h 40 | 100.1 g | $33.78 (era $33.09 con 167 + 16.38) |
+| v2-A: 150 × 92, perfil v1 | 9 h 56 · 391.3 g | 3 h 18 | 130.4 g | $39.78 |
+| v2-B: A + sin z_hop + retracción > 3 mm | 9 h 32 · 391.3 g | 3 h 10 | 130.4 g | $39.78 |
+| **v2-C: B + relleno rayo (el del catálogo)** | **8 h 55 · 335.3 g** | **2 h 58** | **111.8 g** | **$36.09** |
+| v2-E: C + divisores 1.24 | 8 h 58 · 338.2 g | 2 h 59 | 112.7 g | $36.28 ✗ no ahorra |
+
+Desglose de B por gramos: pared exterior 44 %, relleno 23 %, sólido interno 21 % (techos
+de losas y divisores). El estimado antes de laminar era 115–125 g; A salió 130 g por las
+losas, que crecieron con el área del piso (×1.39).
+
+Respaldos: `Portacontroles_Tejido.{3mf,png,stl}.v1.bak`. El `.3mf` del catálogo es el
+laminado C sin el G-code (`slice_info` 335.26 g, 8 h 55): la tarjeta muestra la placa
+de 3.
+
 ## Pendiente
+- v2: imprimir y revisar que los techos de las losas no se hundan sobre el relleno rayo y
+  que sin elevación en Z la boquilla no raye la textura. Si raya, regresar `z_hop` a 0.4.
+- Fotos y medidas de la publicación MLM3713176381 siguen siendo de la v1.
 - Imprimir: revisar que el valle de la textura salga macizo (una vuelta Arachne en 1.24),
   que las cuentas se lean como en la foto y que el celular y los controles entren.
 - Pedir medidas reales de controles gruesos y del celular (ver memoria portacontroles-mas-grande).
