@@ -86,3 +86,54 @@ aplicó.
 - Reabrir en Bambu Studio (ya se hizo `open -a`) y pedir **Rebanar** para
   confirmar peso/tiempo reales — el peso de 115.3g/pieza es el de referencia
   anterior (capa 0.2mm, 1 copia), no una medición nueva con capa 0.12mm.
+
+## 2026-10-28 (v2) — "hacer una grande y una pequeña para mejorar el paquete y que quepan en la caja, y bajar de 122 g sin perder la calidad"
+
+Feedback: tarjeta a 122.0 g / $36.75. Pidió un set grande + chica que quepa en la
+caja 20×16×11 y bajar de 122 g sin perder calidad.
+
+### Diagnóstico
+- Línea base laminada por CLI (v1, una pieza, capa 0.12): **122.05 g, 2 h 59**.
+  31 min de «Internal solid infill»: la pared de la malla mide 2.0 mm y los 4
+  hilos (2 vueltas por cada cara, 0.42+0.45) solo ocupan 1.74 mm; el hueco
+  intermedio se rellena sólido.
+- El v1 no cabe en la caja ni solo: 113 mm de diámetro contra 110 de alto.
+- `ironing_type` = «top surface» (inválido) → Bambu lo trataba como sin alisado.
+  Corregirlo a «top» alisaba cada escalón de la curva: **+33 min** sin beneficio
+  visible. Se dejó explícito «no ironing».
+
+### Cambios
+- Cara interior desplazada a lo largo de su normal hasta **pared 1.7 mm**
+  (vértices interiores: normal hacia el eje, |nz|<0.9, fuera de base y boca;
+  4 pasadas de suavizado). Cara exterior, base y boca intactas. Verificado:
+  watertight, winding consistente, 0 caras invertidas, pared p1–p95 1.69–1.71.
+- Set: **grande ×0.90 (102×102×159 mm)** + **chica ×0.60 (68×68×106 mm)**, ambas
+  con la pared re-afinada a 1.7 mm en absoluto (la chica escalada sola daría 1.2).
+- Caja 20×16×11: acostados uno con la boca hacia cada lado (perfil de revolución,
+  3 mm de holgura); sobran ~12 mm de separación entre ejes para burbuja.
+- Plato P2S: **3 sets** (3 grandes + 3 chicas), separación ≥7 mm, margen 5 mm.
+- `.3mf` con dos objetos (id 2 grande → object_1.model, id 4 chica →
+  object_2.model); model_settings/assemble/cut_information sincronizados.
+  Miniatura `plate_1.png` = vista frontal del precheck.
+- `.catalogo3d_mercadolibre.json`: `peso_g` 122.0 → 119.3 (por set).
+
+### Tabla (CLI Bambu, capa 0.12)
+| Versión | Medidas | Peso | Tiempo | Costo |
+|---|---|---|---|---|
+| v1 una pieza | 113×113×176 | 122.05 g | 2 h 59 | $36.75 |
+| v2 mismo tamaño afinado (no se usó) | 113×113×176 | 108.1 g | 2 h 41 | $34.43 |
+| v2 grande ×0.90 | 102×102×159 | 84.7 g | 2 h 13 | — |
+| v2 chica ×0.60 | 68×68×106 | 34.6 g | 1 h 16 | — |
+| **v2 plato 3 sets** | | **357.9 g** | **9 h 31** | — |
+| **v2 por set** | | **119.3 g** | **3 h 10** | **$36.31** |
+
+Costo = g × 167/1000 + $16.38 (una caja por set). Probado y descartado: chica
+×0.65 con 1.7 mm (41.4 g, set 126 g), grande ×0.92 (89.8 g).
+
+Respaldo: `FloreroOndulado.3mf.v1.bak` (v1 del 10-01, 4 copias).
+
+### Pendiente
+- Imprimir el set y confirmar acabado de la pared de 1.7 mm y que entra en la caja
+  con burbuja.
+- Publicación «florero Ondas»: pasarla a set (mismo trámite que el minimalista,
+  ojo con family_name y título) y subir precio hacia $256–283.
