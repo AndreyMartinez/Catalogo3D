@@ -317,7 +317,7 @@ def acostar(pieza, p):
 
 
 AJUSTES = (Path.home() / "Desktop" / "own design 3d"
-           / "General_Vases_print_profile(5).3mf")
+           / "Florero Minimalista Grande 178mm.3mf")
 LAMINADO = {"wall_loops": "2", "sparse_infill_density": "10%",
             "sparse_infill_pattern": "grid", "enable_support": "0",
             "top_shell_layers": "3", "bottom_shell_layers": "3",

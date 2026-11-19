@@ -193,7 +193,7 @@ def disponer(vaso, bandeja_m, juegos, ancho_b, fondo_b, ancho_v):
 
 
 AJUSTES_FLORERO = (Path.home() / "Desktop" / "own design 3d"
-                   / "General_Vases_print_profile(5).3mf")
+                   / "Florero Minimalista Grande 178mm.3mf")
 RESOLUCION = "0.05"      # mm; el valor de fábrica (0.012) deja ~1 millón de trazos
 # Ver la nota de VASO: un perímetro, Arachne, y sin los rellenos de hueco de
 # menos de 2 mm que dejaba cada cresta (eran 300 trazos sueltos por capa).

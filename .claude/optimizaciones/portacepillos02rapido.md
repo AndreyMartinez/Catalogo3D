@@ -3,7 +3,7 @@
 Archivo: `own design 3d/portacepillos/Portacepillos02RAPIDO.3mf` (+ `.png`)
 Se regenera con `python3 generadores/portacepillos_rapido.py --salida <carpeta>`.
 Origen: pedido del usuario (2026-10-07) — el 01O tarda ~1 día y es de lo que más
-sale; el florero `General_Vases` (líneas parecidas) imprime en ~4 h. Pidió
+sale; el florero `Florero Minimalista Grande 178mm` (líneas parecidas) imprime en ~4 h. Pidió
 construir sobre el florero para que sea "demasiado rápido".
 
 ## Diagnóstico (por qué el 01O tarda un día y el florero no)

@@ -40,7 +40,7 @@ Los parámetros completos van dentro del .3mf (`Catalogo3D:parametros`).
 Forma **sin cambios** (la v7 aprobada). Respaldo: `Portacubiertos_Trenzado.{3mf,png,stl}.v7.bak`.
 
 - El script ahora **embebe los ajustes de laminado** (`embeber_ajustes`): copia el
-  `project_settings` del florero (`General_Vases_print_profile(5).3mf`: P2S 0.4,
+  `project_settings` del florero (`Florero Minimalista Grande 178mm.3mf`: P2S 0.4,
   0.20 Standard, Bambu PLA Basic), regresa relleno 15 % y 5 capas de techo a los de
   fábrica, deja Arachne, `resolution` 0.05 e `infill_combination` 1, y declara el .3mf
   de Bambu Studio (metadato Application). Por objeto (`POR_OBJETO`): bandeja al 10 %.
