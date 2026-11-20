@@ -168,7 +168,20 @@ objetos reales entran y que se ve como el render.
 - Precio dentro de la banda medida, con costo y margen a la vista.
 - Fotos: la pieza **en uso** y una que muestre el diferenciador que salió de
   los comentarios.
-- **La publicación la crea el usuario** en ML; tú no publicas. Cuando exista:
+- **Fotos con IA antes de imprimir**: `generadores/fotos_gemini.py` manda un
+  render de referencia (crema sobre blanco, `render.render` a 1024) y una escena
+  a Gemini; escenas `blanco`, `detalle`, `arriba`, `repisa`, `mesa`,
+  `recamara`, `escritorio`, `recibidor`, `mano` o `--prompt`, y `--color`
+  para recolorear («matte black»). La llave se guarda con `--guardar-llave`
+  en una terminal (no desde el `!` del chat). Revisa **cada** foto contra la
+  pieza (número de gajos, giro, estría) y que la escena no prometa lo que la
+  pieza no hace (planta que no cabe en la boca, agua en pared de una vuelta).
+  Súbelas a 1200×1200; la principal se cambia por foto real al imprimir.
+- **La publicación la crea el usuario** en ML. Solo si él lo pide con un «sí»
+  explícito se publica por API: subir fotos (`POST /pictures/items/upload`),
+  `POST /items/validate`, `POST /items` con `family_name` (≤ 60, sin color) y
+  la descripción en `POST /items/{id}/description`; copiar categoría y
+  atributos de una publicación hermana. Cuando exista:
 
 ```bash
 python3 .claude/skills/producto-nuevo/scripts/tablero.py publicar <slug> MLM1234567890 --precio 198

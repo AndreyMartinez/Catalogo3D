@@ -43,6 +43,8 @@ galería, el motor o un skill, propón `sdd`; si es una tarea puntual, hazla.
   (`huevo_lowpoly.py`, `portacepillos_rapido.py`…). `precheck.py` saca el mosaico
   de vistas desde todos los lados de un `.3mf`/`.stl`. Si todavía no está en tu
   checkout, vive en la copia de trabajo principal sin versionar.
+  `fotos_gemini.py` genera fotos de producto con Gemini a partir de un render
+  (llave en `~/.catalogo3d/gemini_key`, nunca en el repo).
 
 ### Conocimiento versionado (`.claude/`)
 
