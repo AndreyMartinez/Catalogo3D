@@ -132,9 +132,43 @@ Pedido: «¿cabe en la caja?» → no: la bandeja de 3 vasos mide 25.2 cm y ni i
 | v9 (3 vasos, no cabe en la caja) | 8 h 14 | 263.0 g | $60.30 |
 | **v10 (2 vasos 92 × 100)** | **6 h 33** | **211.8 g** | **$51.75** |
 
+## 2026-11-22 (v11) — «los vasos se están rompiendo muy fácil, hazlos más fuertes»
+Impreso: **se truenan costillas y el vaso se parte en anillo** (entre capas). Respaldo:
+`Portacubiertos_Trenzado.{3mf,png,stl}.v10.bak`. Aprobado con el precheck («B: sólida»).
+
+Diagnóstico: cada costilla era una lámina suelta de 91 mm (solo pegada al zócalo y al
+aro de la boca), de 1.1 mm en la orilla de la rendija, y desde la v9 con relleno ligero
+por dentro (dos pieles de 0.45 mm). Poco material de capa a capa y nada que la amarre.
+
+Cambios (forma por fuera igual, juego 195.9 × 100.9 × 103.1, cabe en la caja):
+- `canto` 1.0 → **1.8**, `grueso` 2.4 → **3.2**: sección por costilla en la panza
+  34 → 45 mm² (+32 %), lo más delgado 1.1 → 1.9 mm. El vaso queda 1.6 mm más angosto
+  por dentro.
+- **2 aros por dentro** (`aros`, `aro_cara` 4, `aro_entra` 2.0, `aro_fondo` 1.2) a 1/3 y
+  2/3 entre zócalo y boca: el tramo suelto baja de 91 a ~30 mm. Cara recta de 4 mm (lo
+  que se asoma por la rendija, 0.6 mm por debajo de la orilla) y chaflanes a 45° arriba
+  y abajo: sin soporte y sin repisa.
+- Se quitó `minimum_sparse_infill_area` 0 de los vasos: costillas sólidas otra vez.
+- El donante de perfil (`Florero Minimalista Grande 178mm.3mf`) ya no está en
+  `own design 3d/`; se usó el .3mf v10 del catálogo con `--ajustes`. El script ahora
+  avisa si falta el donante.
+
+Juego (CLI), costo = g × 180 $/kg + $13.96:
+
+| Versión | Tiempo | Peso | Costo |
+|---|---|---|---|
+| v10 | 6 h 33 | 211.8 g | $52.08 |
+| A: forma v11, costillas con relleno ligero | 7 h 54 | 247.5 g | $58.52 |
+| **v11 — B: forma v11, costillas sólidas (elegida)** | **8 h 05** | **261.2 g** | **$60.97** |
+| C: B + 3 paredes en vasos | 9 h 16 | 287.5 g | $65.70 |
+| D: B + 4 paredes en vasos | 9 h 25 | 291.9 g | $66.49 |
+
 ## Pendiente / conocido
-- **Imprimir** el juego y revisar las costillas (sin z-hop se ahorrarían 17 min por vaso,
-  51 por juego, pero la boquilla podría raspar las costillas: no se aplicó).
+- **Imprimir la v11** y confirmar que ya no se truenan. Si todavía se parte en anillo,
+  lo siguiente es adhesión entre capas (temperatura de boquilla +10 °C o menos
+  ventilador en los vasos), no más geometría.
+- Sin z-hop se ahorrarían 17 min por vaso, 51 por juego, pero la boquilla podría
+  raspar las costillas: no se aplicó.
 - Vaso de 80 mm (v9) 49.3 g laminado; la suma de sólidos del script sobreestima.
 - Holgura justa en la caja (4 mm): si el burbuja no deja cerrar, `--largo 190`.
 - El tiempo lo mandan los vasos, sobre todo los trayectos entre costillas.

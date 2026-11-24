@@ -42,13 +42,22 @@ VASO = {
     "costillas": 14,
     "inclinacion": 35.0,     # grados respecto de la vertical
     "rendija": 2.2,          # mm, medida en perpendicular a la costilla
-    "canto": 1.0,            # grueso de la costilla en sus orillas
-    "grueso": 2.4,           # la costilla es cáscara de este grueso
+    "canto": 1.8,            # grueso de la costilla en sus orillas (v10: 1.0,
+                             # se tronaban)
+    "grueso": 3.2,           # la costilla es cáscara de este grueso (v10: 2.4)
     "panza": 4.0,            # lo que sobresale la cresta sobre el canto
     "piso": 1.6,
     "drenaje": 4.0,          # diámetro de los agujeros del piso
     "zocalo": 6.0,           # anillo macizo de abajo (queda dentro de la bandeja)
     "aro": 3.0,              # anillo macizo de la boca
+    "aros": 2,               # aros por dentro que amarran las costillas a media
+                             # altura (v11): sin ellos cada costilla era una
+                             # lámina suelta de 91 mm y se tronaba
+    "aro_cara": 4.0,         # alto de la cara recta del aro (lo que se ve por
+                             # la rendija); arriba y abajo lleva chaflán a 45°
+    "aro_entra": 2.0,        # lo que el aro sale hacia adentro del vaso
+    "aro_fondo": 1.2,        # lo que se mete en las costillas, desde su cara
+                             # de adentro (queda 0.6 bajo la orilla de la rendija)
     "capas": 0.5,            # mm entre secciones del barrido
 }
 
@@ -174,6 +183,23 @@ def vaso(v):
         (radio_int(v, za), za), (radio_ext(v, za) - 0.4, za),
         (radio_ext(v, h) - 0.4, h - 0.8), (radio_ext(v, h) - 1.2, h),
         (radio_int(v, h) + 0.4, h), (radio_int(v, h), h - 0.4)]))
+    # Aros por dentro, repartidos parejo entre zócalo y boca. Se meten en las
+    # orillas de las costillas y cruzan las rendijas por detrás; los chaflanes
+    # a 45° los hacen imprimibles sin soporte y no dejan repisa donde se
+    # atore un cubierto.
+    e = v["aro_entra"] + v["aro_fondo"]
+    for i in range(1, int(v["aros"]) + 1):
+        zc = zs + (za - zs) * i / (v["aros"] + 1)
+        z0 = zc - v["aro_cara"] / 2.0 - e
+        z1 = zc + v["aro_cara"] / 2.0 + e
+        zb, zt = z0 + e, z1 - e
+        m.unir(solido_de_revolucion([
+            (radio_int(v, z0) + v["aro_fondo"], z0),
+            (radio_int(v, zb) + v["aro_fondo"], zb),
+            (radio_int(v, zt) + v["aro_fondo"], zt),
+            (radio_int(v, z1) + v["aro_fondo"], z1),
+            (radio_int(v, zt) - v["aro_entra"], zt),
+            (radio_int(v, zb) - v["aro_entra"], zb)]))
     # Costillas, encimadas 0.6 mm en cada anillo para que queden soldadas.
     for j in range(v["costillas"]):
         m.unir(costilla(v, 2 * math.pi * j / v["costillas"], zs - 0.6, za + 0.6))
@@ -368,13 +394,11 @@ DE_FABRICA = {"sparse_infill_density", "skeleton_infill_density",
 # huecas las cinturas por dentro salió peor (133 g, +22 min): el relleno ya
 # las dejaba huecas y la cavidad suma paredes.
 #
-# Las costillas del vaso (cáscara de 2.4 mm) tienen por dentro menos de 15 mm²
-# y el laminador las llenaba de relleno sólido. Con el área mínima en 0 llevan
-# relleno ligero entre sus dos paredes: 54.5 → 49.3 g y 2 h 29 → 2 h 03 por
-# vaso, sin cambiar la forma. Con una sola pared bajaba a 37.4 g, pero la piel
-# de la costilla queda de 0.45 mm: se descartó por frágil.
-POR_OBJETO = {"bandeja": {"sparse_infill_density": "10%"},
-              "vaso": {"minimum_sparse_infill_area": "0"}}
+# Las costillas del vaso van con el relleno que decida el laminador (sólido en
+# casi todas). En la v9–v10 se puso el área mínima en 0 para que llevaran
+# relleno ligero entre sus dos paredes (−5 g y −26 min por vaso), pero impresas
+# se tronaban y el vaso se partía en anillo: se regresó (v11, 11-22).
+POR_OBJETO = {"bandeja": {"sparse_infill_density": "10%"}}
 
 
 def modelo_settings(modelo):
@@ -493,6 +517,9 @@ def main():
                                          diseno="portacubiertos_trenzado"))
     if a.ajustes and Path(a.ajustes).exists():
         embeber_ajustes(ruta, a.ajustes)
+    elif a.ajustes:
+        print("  ¡Ojo! no está %s: el .3mf sale sin perfil de laminado "
+              "(pasa otro con --ajustes)" % a.ajustes)
     exportar.guardar_stl(piezas, ruta.with_suffix(".stl"), a.nombre)
     exportar.guardar_stl([("juego", juego, 0, 0)],
                          carpeta / (a.nombre + "_armado.stl"), a.nombre)
