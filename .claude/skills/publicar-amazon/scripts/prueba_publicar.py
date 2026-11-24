@@ -1,0 +1,1169 @@
+#!/usr/bin/env python3
+"""Pruebas del publicador ML → Amazon, sin red ni credenciales reales.
+
+Las credenciales de prueba son inventadas y viven en una carpeta temporal;
+nunca se toca ~/.catalogo3d/.
+
+Uso:  python3 prueba_publicar.py
+"""
+import base64
+import hashlib
+import io
+import json
+import struct
+import os
+import sys
+import tempfile
+import unittest
+import urllib.error
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import borrador  # noqa: E402
+import publicar  # noqa: E402
+import esquema  # noqa: E402
+import sp_api  # noqa: E402
+
+# Inventadas, con la forma de las reales.
+CRED_FALSAS = {
+    "client_id": "amzn1.application-oa2-client.0123456789abcdef0123456789abcdef",
+    "client_secret": "amzn1.oa2-cs.v1.prueba0000000000000000000000000000000000000000000000000000",
+    "refresh_token": "Atzr|IwEBIPrueba-de-refresco-inventado-para-las-pruebas-0000000000",
+    "seller_id": "A1PRUEBA0000XX",
+}
+
+
+class Credenciales(unittest.TestCase):
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.ruta = Path(self._tmp.name) / "amazon_credenciales.json"
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def escribir(self, datos, modo=0o600):
+        self.ruta.write_text(json.dumps(datos), encoding="utf-8")
+        os.chmod(self.ruta, modo)
+
+    def test_lee_con_600(self):
+        self.escribir(CRED_FALSAS)
+        self.assertEqual(sp_api.cargar_credenciales(self.ruta), CRED_FALSAS)
+
+    def test_rechaza_644(self):
+        self.escribir(CRED_FALSAS, 0o644)
+        with self.assertRaises(sp_api.ErrorSP) as e:
+            sp_api.cargar_credenciales(self.ruta)
+        self.assertIn("chmod 600", str(e.exception))
+        self.assertIn("644", str(e.exception))
+
+    def test_falta_el_archivo(self):
+        with self.assertRaises(sp_api.ErrorSP) as e:
+            sp_api.cargar_credenciales(self.ruta)
+        texto = str(e.exception)
+        for campo in sp_api.CAMPOS:
+            self.assertIn(campo, texto)
+        self.assertIn("Autorizar aplicación", texto)
+        self.assertIn("No los pegues en el chat", texto)
+        # Los ejemplos de la ayuda no se confunden con secretos.
+        self.assertIn("Atzr|…", texto)
+        self.assertIn("amzn1.oa2-cs.v1.…", texto)
+
+    def test_falta_un_campo_sin_ensenar_los_demas(self):
+        datos = dict(CRED_FALSAS, seller_id="")
+        self.escribir(datos)
+        with self.assertRaises(sp_api.ErrorSP) as e:
+            sp_api.cargar_credenciales(self.ruta)
+        texto = str(e.exception)
+        self.assertIn("le falta: seller_id", texto)
+        for valor in datos.values():
+            if valor:
+                self.assertNotIn(valor, texto)
+
+    def test_json_roto(self):
+        self.ruta.write_text('{"client_id": "' + CRED_FALSAS["client_id"],
+                             encoding="utf-8")
+        os.chmod(self.ruta, 0o600)
+        with self.assertRaises(sp_api.ErrorSP) as e:
+            sp_api.cargar_credenciales(self.ruta)
+        self.assertIn("no es JSON válido", str(e.exception))
+        self.assertNotIn(CRED_FALSAS["client_id"], str(e.exception))
+
+
+class Tapar(unittest.TestCase):
+
+    def test_tapa_valores_cargados(self):
+        sp_api._registrar_secreto("valor-cualquiera-registrado")
+        texto = sp_api._tapar("falló con valor-cualquiera-registrado en el cuerpo")
+        self.assertNotIn("valor-cualquiera-registrado", texto)
+        self.assertIn("***", texto)
+
+    def test_tapa_formas_de_lwa_sin_cargarlas(self):
+        token = "Atza|IwEBIAccesoNuevoQueNadieRegistro-0000000000000000"
+        secreto = "amzn1.oa2-cs.v1.otroSecretoNoRegistrado000000000000000"
+        texto = sp_api._tapar(f'{{"access_token": "{token}", "s": "{secreto}"}}')
+        self.assertNotIn(token, texto)
+        self.assertNotIn(secreto, texto)
+
+    def test_error_sale_tapado(self):
+        e = sp_api.ErrorSP("LWA respondió: " + CRED_FALSAS["refresh_token"])
+        self.assertNotIn(CRED_FALSAS["refresh_token"], str(e))
+
+
+# ------------------------------------------------------------ peticiones
+
+class _Respuesta:
+    def __init__(self, cuerpo):
+        self._cuerpo = cuerpo.encode() if isinstance(cuerpo, str) else cuerpo
+
+    def read(self):
+        return self._cuerpo
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+
+def _http(codigo, cuerpo=""):
+    return urllib.error.HTTPError("https://x", codigo, "x", {}, io.BytesIO(cuerpo.encode()))
+
+
+TOKEN_LWA = json.dumps({"access_token": "Atza|AccesoDePrueba-0000000000000000000000",
+                        "expires_in": 3600})
+
+
+class Peticiones(unittest.TestCase):
+    """sp_api.pedir con urlopen sustituido: cada llamada saca la siguiente
+    respuesta de un guion. Nadie duerme de verdad."""
+
+    def setUp(self):
+        self.guardado = (sp_api._abrir, sp_api._dormir, sp_api._cred,
+                         sp_api._token, sp_api._vence, sp_api._ultima)
+        sp_api._cred = dict(CRED_FALSAS)
+        for v in CRED_FALSAS.values():
+            sp_api._registrar_secreto(v)
+        sp_api._token, sp_api._vence, sp_api._ultima = None, 0.0, 0.0
+        self.esperas = []
+        sp_api._dormir = self.esperas.append
+        self.pedidos = []
+
+    def tearDown(self):
+        (sp_api._abrir, sp_api._dormir, sp_api._cred,
+         sp_api._token, sp_api._vence, sp_api._ultima) = self.guardado
+
+    def guion(self, *pasos):
+        pasos = list(pasos)
+
+        def abrir(pedido, timeout=None):
+            self.pedidos.append(pedido)
+            paso = pasos.pop(0)
+            if isinstance(paso, Exception):
+                raise paso
+            return _Respuesta(paso)
+        sp_api._abrir = abrir
+
+    def a_sp(self):
+        return [p for p in self.pedidos if p.full_url.startswith(sp_api.HOST)]
+
+    def test_429_y_luego_200(self):
+        self.guion(TOKEN_LWA, _http(429), '{"items": []}')
+        r = sp_api.pedir("GET", "/listings/2021-08-01/items/A1",
+                         {"marketplaceIds": [sp_api.MARKETPLACE], "x": None})
+        self.assertEqual(r, {"items": []})
+        self.assertEqual(len(self.a_sp()), 2)
+        self.assertIn(1, self.esperas)
+        url = self.a_sp()[0].full_url
+        self.assertIn("marketplaceIds=A1AM78C64UM0Y8", url)
+        self.assertNotIn("x=", url)
+        self.assertTrue(self.a_sp()[0].get_header("X-amz-access-token").startswith("Atza|"))
+
+    def test_seis_429_dan_error(self):
+        self.guion(TOKEN_LWA, *[_http(429, "TooManyRequests") for _ in range(6)])
+        with self.assertRaises(sp_api.ErrorSP) as e:
+            sp_api.pedir("GET", "/x")
+        self.assertIn("falló 6 veces", str(e.exception))
+        self.assertEqual([x for x in self.esperas if x >= 1], list(sp_api.ESPERAS))
+
+    def test_caida_de_red_reintenta(self):
+        self.guion(TOKEN_LWA, urllib.error.URLError("timeout"), "{}")
+        self.assertEqual(sp_api.pedir("GET", "/x"), {})
+
+    def test_401_renueva_una_vez(self):
+        otro = json.dumps({"access_token": "Atza|OtroAccesoRenovado-00000000000000000",
+                           "expires_in": 3600})
+        self.guion(TOKEN_LWA, _http(401), otro, '{"ok": 1}')
+        self.assertEqual(sp_api.pedir("GET", "/x"), {"ok": 1})
+        self.assertEqual(self.a_sp()[-1].get_header("X-amz-access-token"),
+                         "Atza|OtroAccesoRenovado-00000000000000000")
+
+    def test_403_persistente_explica_roles(self):
+        self.guion(TOKEN_LWA, _http(403), TOKEN_LWA, _http(403, "Unauthorized"))
+        with self.assertRaises(sp_api.ErrorSP) as e:
+            sp_api.pedir("GET", "/x")
+        self.assertIn("Product Listing", str(e.exception))
+
+    def test_400_no_reintenta(self):
+        self.guion(TOKEN_LWA, _http(400, '{"errors": [{"code": "InvalidInput"}]}'))
+        with self.assertRaises(sp_api.ErrorSP) as e:
+            sp_api.pedir("PUT", "/x", cuerpo={"a": 1})
+        self.assertIn("400", str(e.exception))
+        self.assertEqual(len(self.a_sp()), 1)
+        self.assertEqual(self.a_sp()[0].get_header("Content-type"), "application/json")
+
+    def test_ningun_secreto_en_los_errores(self):
+        eco = " ".join(CRED_FALSAS.values()) + " Atza|AccesoDePrueba-0000000000000000000000"
+        self.guion(TOKEN_LWA, _http(400, eco))
+        with self.assertRaises(sp_api.ErrorSP) as e:
+            sp_api.pedir("GET", "/x")
+        for valor in list(CRED_FALSAS.values()) + ["Atza|AccesoDePrueba"]:
+            self.assertNotIn(valor, str(e.exception))
+
+    def test_lwa_rechaza(self):
+        self.guion(_http(400, '{"error": "invalid_grant", "error_description": "' +
+                         CRED_FALSAS["refresh_token"] + '"}'))
+        with self.assertRaises(sp_api.ErrorSP) as e:
+            sp_api.pedir("GET", "/x")
+        self.assertIn("invalid_grant", str(e.exception))
+        self.assertIn("Autorizar aplicación", str(e.exception))
+        self.assertNotIn(CRED_FALSAS["refresh_token"], str(e.exception))
+
+    def test_token_se_reusa(self):
+        self.guion(TOKEN_LWA, "{}", "{}")
+        sp_api.pedir("GET", "/x")
+        sp_api.pedir("GET", "/y")
+        lwa = [p for p in self.pedidos if p.full_url == sp_api.LWA]
+        self.assertEqual(len(lwa), 1)
+
+
+# ---------------------------------------------------------------- esquema
+
+ESQUEMA_MINIMO = {"required": ["brand", "item_name"],
+                  "properties": {"item_name": {"items": {"properties": {
+                      "value": {"type": "string", "maxLength": 200}}}}}}
+
+
+class CacheDeEsquema(unittest.TestCase):
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.guardado = (esquema.CARPETA, sp_api.pedir, sp_api._abrir)
+        esquema.CARPETA = Path(self._tmp.name) / "amazon" / "esquemas"
+        esquema._vistos.clear()
+        self.version = "v1"
+        self.bajadas = 0
+        self.crudo = json.dumps(ESQUEMA_MINIMO).encode()
+
+        def pedir(metodo, ruta, params=None, cuerpo=None):
+            return {"productType": "CADDY", "displayName": "Caddy",
+                    "productTypeVersion": {"version": self.version},
+                    "propertyGroups": {"offer": {"propertyNames": ["list_price"]}},
+                    "schema": {"link": {"resource": "https://firmado/x"},
+                               "checksum": base64.b64encode(
+                                   hashlib.md5(self.crudo).digest()).decode()}}
+
+        def abrir(url, timeout=None):
+            self.bajadas += 1
+            return _Respuesta(self.crudo)
+        sp_api.pedir, sp_api._abrir = pedir, abrir
+
+    def tearDown(self):
+        esquema.CARPETA, sp_api.pedir, sp_api._abrir = self.guardado
+        esquema._vistos.clear()
+        self._tmp.cleanup()
+
+    def test_baja_una_vez_y_reusa(self):
+        c = esquema.esquema("CADDY")
+        self.assertEqual(esquema.obligatorios(c), ["brand", "item_name"])
+        self.assertEqual(c["grupos"], {"offer": ["list_price"]})
+        esquema._vistos.clear()              # otra corrida, misma versión
+        esquema.esquema("CADDY")
+        self.assertEqual(self.bajadas, 1)
+        ruta = esquema.CARPETA / "CADDY.json"
+        self.assertEqual(os.stat(ruta).st_mode & 0o777, 0o600)
+        self.assertEqual(os.stat(esquema.CARPETA).st_mode & 0o777, 0o700)
+
+    def test_version_nueva_baja_otra_vez(self):
+        esquema.esquema("CADDY")
+        esquema._vistos.clear()
+        self.version = "v2"
+        self.assertEqual(esquema.esquema("CADDY")["version"], "v2")
+        self.assertEqual(self.bajadas, 2)
+
+    def test_checksum_malo(self):
+        crudo = self.crudo
+        self.crudo = b'{"required": []}'
+        # El checksum se calcula del bueno; lo que baja es otro.
+        sp_api.pedir = (lambda viejo: lambda *a, **k: dict(
+            viejo(*a, **k), schema={"link": {"resource": "x"},
+                                    "checksum": base64.b64encode(
+                                        hashlib.md5(crudo).digest()).decode()}))(sp_api.pedir)
+        with self.assertRaises(sp_api.ErrorSP):
+            esquema.esquema("CADDY")
+        self.assertFalse((esquema.CARPETA / "CADDY.json").exists())
+
+
+def _texto(valor):
+    return [{"value": valor, "language_tag": "es_MX", "marketplace_id": "A1AM78C64UM0Y8"}]
+
+
+ESQUEMA_REVISION = {"tipo": "CADDY", "esquema": {
+    "required": ["brand", "item_name", "country_of_origin"],
+    "additionalProperties": False,
+    "properties": {
+        "brand": {"items": {"required": ["language_tag", "value"], "properties": {
+            "value": {"type": "string", "minLength": 1, "maxLength": 100}}}},
+        "item_name": {"items": {"required": ["language_tag", "value"], "properties": {
+            "value": {"type": "string", "maxLength": 200}}}},
+        "generic_keyword": {"items": {"properties": {
+            "value": {"type": "string", "maxUtf8ByteLength": 10}}}},
+        "country_of_origin": {"items": {"required": ["value"], "properties": {
+            "value": {"type": "string", "enum": ["MX", "US"],
+                      "enumNames": ["México", "Estados Unidos"]}}}},
+        "material": {"items": {"properties": {"value": {"type": "string", "anyOf": [
+            {"type": "string"},
+            {"type": "string", "enum": ["PLA", "Plástico", "Acero al carbono", "Acero inoxidable"],
+             "enumNames": ["PLA", "Plástico", "Acero al carbono", "Acero inoxidable"]}]}}}},
+        "supplier_declared_has_product_identifier_exemption": {"items": {"properties": {
+            "value": {"type": "boolean", "enum": [False, True]}}}},
+    }}}
+
+
+class Revision(unittest.TestCase):
+
+    def base(self):
+        return {"brand": _texto("Generic"), "item_name": _texto("Organizador"),
+                "country_of_origin": [{"value": "MX"}]}
+
+    def errores(self, atributos):
+        return [(h["campo"], h["detalle"]) for h in esquema.revisar(atributos, ESQUEMA_REVISION)
+                if h["tipo"] == "error"]
+
+    def test_limpio(self):
+        self.assertEqual(esquema.revisar(self.base(), ESQUEMA_REVISION), [])
+
+    def test_obligatorio_faltante(self):
+        a = self.base()
+        del a["brand"]
+        a["item_name"] = []
+        campos = [c for c, _ in self.errores(a)]
+        self.assertEqual(sorted(campos), ["brand", "item_name"])
+
+    def test_titulo_de_201(self):
+        a = dict(self.base(), item_name=_texto("x" * 201))
+        self.assertEqual(self.errores(a), [("item_name", "201 caracteres; el máximo es 200")])
+
+    def test_bytes_cuentan_acentos(self):
+        a = dict(self.base(), generic_keyword=_texto("ñañaña"))   # 6 letras, 9 bytes
+        self.assertEqual(self.errores(a), [])
+        a = dict(self.base(), generic_keyword=_texto("ñañañaña"))  # 12 bytes
+        self.assertIn("12 bytes", self.errores(a)[0][1])
+
+    def test_fuera_de_lista_cerrada_es_error(self):
+        a = dict(self.base(), country_of_origin=[{"value": "México"}])
+        self.assertIn("no está en la lista", self.errores(a)[0][1])
+
+    def test_fuera_de_lista_sugerida_es_aviso(self):
+        a = dict(self.base(), material=_texto("Madera"))
+        h = esquema.revisar(a, ESQUEMA_REVISION)
+        self.assertEqual([x["tipo"] for x in h], ["aviso"])
+
+    def test_atributo_que_el_tipo_no_tiene(self):
+        a = dict(self.base(), capacity=[{"value": 2.5, "unit": "liters"}])
+        self.assertEqual(self.errores(a), [("capacity", "el tipo CADDY no tiene este atributo")])
+
+    def test_subcampo_requerido(self):
+        a = dict(self.base(), brand=[{"value": "Generic"}])
+        self.assertEqual(self.errores(a), [("brand", "le falta language_tag")])
+
+    def test_mas_cercano(self):
+        valores, nombres, cerrada = esquema.opciones(ESQUEMA_REVISION, "material")
+        self.assertFalse(cerrada)
+        self.assertEqual(esquema.valor_mas_cercano("PLA", valores, nombres), "PLA")
+        self.assertEqual(esquema.valor_mas_cercano("plastico", valores, nombres), "Plástico")
+        self.assertIsNone(esquema.valor_mas_cercano("acero", valores, nombres))   # ambiguo
+        self.assertIsNone(esquema.valor_mas_cercano("Madera", valores, nombres))
+        v, n, cerrada = esquema.opciones(ESQUEMA_REVISION, "country_of_origin")
+        self.assertTrue(cerrada)
+        self.assertEqual(esquema.valor_mas_cercano("México", v, n), "MX")
+
+    def test_palabra_completa(self):
+        # «pla» no debe caer en «Plástico» por empezar igual.
+        self.assertIsNone(esquema.valor_mas_cercano("pla", ["Plástico", "Vidrio"]))
+        self.assertEqual(esquema.valor_mas_cercano("carbono", ["Acero al carbono", "Vidrio"]),
+                         "Acero al carbono")
+
+    def test_exencion(self):
+        self.assertEqual(esquema.atributo_exencion(ESQUEMA_REVISION),
+                         "supplier_declared_has_product_identifier_exemption")
+
+
+# ------------------------------------------------------ reglas de texto
+
+# Publicación real del Olas en ML (MLM3674350731), recortada. Es texto
+# público de la propia publicación.
+OLAS_TITULO = "Organizador De Cubiertos Olas Más Obsequios Negro"
+OLAS_DESCRIPCION = """ORGANIZADOR DE CUBIERTOS OLAS - 3 COMPARTIMENTOS
+
+Ten tus cubiertos ordenados y siempre a la mano con este portacubiertos de sobremesa.
+
+Sepáralos en sus 3 compartimentos: tenedores, cucharas y cuchillos.
+
+INCLUYE OBSEQUIO DE SIEMBRA
+Además recibes una maceta pequeña, humus y semillas para que siembres tu propia planta. Un detalle que hace de tu compra un regalo especial.
+
+CARACTERÍSTICAS
+- Portacubiertos de sobremesa con 3 compartimentos
+- Color: negro
+- Material: PLA, bioplástico biodegradable de origen vegetal, acabado mate
+
+CUIDADOS
+- Lávalo a mano con agua tibia y jabón neutro
+- Evita el sol directo y las fuentes de calor
+
+IMPORTANTE
+Pieza hecha con impresión 3D: puede presentar finas líneas de capa propias del proceso.
+
+¿Tienes dudas? Escríbenos en preguntas, con gusto te respondemos.
+
+¿Necesitas factura? Te la generamos. Solo envíanos tus datos fiscales por mensaje después de tu compra."""
+
+
+class Texto(unittest.TestCase):
+
+    def test_titulo_del_olas(self):
+        t, avisos = borrador.limpiar_titulo(OLAS_TITULO)
+        self.assertEqual(t, "Organizador De Cubiertos Olas Negro")
+        self.assertIn("«Más Obsequios»", avisos[0])
+
+    def test_titulos_reales(self):
+        casos = {
+            "Organizador De Control Remoto Más Regalos Sorpresa": "Organizador De Control Remoto",
+            "Portalapices Moderno Diseño Mas Obsequio De Cultivo": "Portalapices Moderno Diseño",
+            "Florero Decorativo Ondas, Con Regalo Cultivo Botanico Gris": "Florero Decorativo Ondas Gris",
+            "Organizador De Tocador Baño Cepillos. Más Regalo Sorpresa Negro":
+                "Organizador De Tocador Baño Cepillos Negro",
+            "Organizador De Cubiertos Más Obsequio De Siembra Gris": "Organizador De Cubiertos Gris",
+            "Portacepillos De Baño Más Regalos Savia Raiz Negro": "Portacepillos De Baño Negro",
+        }
+        for ml, esperado in casos.items():
+            self.assertEqual(borrador.limpiar_titulo(ml)[0], esperado, ml)
+
+    def test_promociones_y_caracteres(self):
+        t, avisos = borrador.limpiar_titulo("Florero ¡Envío Gratis! Oferta Negro $")
+        self.assertNotRegex(t.lower(), r"gratis|oferta|!|\$")
+        self.assertEqual(len(avisos), 2)
+
+    def test_marca_propia_al_frente(self):
+        t, _ = borrador.limpiar_titulo("Portacepillos De Baño Más Regalos Savia Raiz Negro",
+                                       marca="Savia Raíz")
+        self.assertEqual(t, "Savia Raíz Portacepillos De Baño Negro")
+        t, _ = borrador.limpiar_titulo("Florero Ondas Negro", marca="Savia Raíz")
+        self.assertEqual(t, "Savia Raíz Florero Ondas Negro")
+
+    def test_kit_de_siembra_se_queda_con_aviso(self):
+        titulo = "Kit Maceta De Escritorio Con Humus, Semillas Y Tarro Blanco Carita"
+        t, avisos = borrador.limpiar_titulo(titulo)
+        self.assertEqual(t, titulo)
+        self.assertTrue(any("restringido" in a for a in avisos))
+        texto = "KIT MACETA\n\nEste kit trae una maceta, humus y semillas.\n\n¿Tienes dudas? Escríbenos."
+        lim, _ = borrador.limpiar_descripcion(texto, kit=borrador.es_kit(titulo))
+        self.assertIn("humus y semillas", borrador.descripcion(lim))
+
+    def test_maceta_no_es_kit(self):
+        t, avisos = borrador.limpiar_titulo("Maceta Geométrica Minimalista Negra")
+        self.assertEqual(avisos, [])
+        lim, avisos = borrador.limpiar_descripcion(
+            "MACETA GEOMÉTRICA\n\nUna maceta para tu suculenta favorita.")
+        self.assertEqual(avisos, [])
+        self.assertIn("maceta para tu suculenta", borrador.descripcion(lim))
+
+    def test_descripcion_sin_obsequio_ni_cierre(self):
+        lim, avisos = borrador.limpiar_descripcion(OLAS_DESCRIPCION)
+        todo = borrador.descripcion(lim) + " ".join(borrador.vinetas(lim))
+        for fuera in ("OBSEQUIO", "humus", "semillas", "regalo", "¿Tienes dudas?", "factura"):
+            self.assertNotIn(fuera, todo)
+        self.assertIn("CARACTERÍSTICAS", borrador.descripcion(lim))
+        self.assertTrue(any("restringido" in a for a in avisos))
+        self.assertTrue(any("cierre de ML" in a for a in avisos))
+
+    def test_vinetas(self):
+        lim, _ = borrador.limpiar_descripcion(OLAS_DESCRIPCION)
+        v = borrador.vinetas(lim, "MEDIDAS: 19.6 x 7.8 x 10.2 cm.")
+        self.assertEqual(len(v), 5)
+        self.assertTrue(v[0].startswith("Ten tus cubiertos"))
+        self.assertEqual(v[1], "CARACTERÍSTICAS: Portacubiertos de sobremesa con 3 compartimentos; "
+                               "Color: negro; Material: PLA, bioplástico biodegradable de origen "
+                               "vegetal, acabado mate.")
+        self.assertEqual(v[2], "MEDIDAS: 19.6 x 7.8 x 10.2 cm.")
+        self.assertTrue(v[3].startswith("CUIDADOS: Lávalo a mano"))
+        self.assertTrue(v[4].startswith("IMPORTANTE: Pieza hecha"))
+        # Sin medidas, el segundo párrafo de entrada ocupa el lugar.
+        v = borrador.vinetas(lim)
+        self.assertTrue(v[1].startswith("Sepáralos"))
+
+    def test_sin_descripcion(self):
+        lim, _ = borrador.limpiar_descripcion("¿Necesitas factura? Te la generamos.")
+        self.assertEqual(lim, [])
+        self.assertEqual(borrador.vinetas(lim, "MEDIDAS: 1 cm."), ["MEDIDAS: 1 cm."])
+
+    def test_palabras_clave(self):
+        claves = borrador.palabras_clave(
+            OLAS_TITULO, "Organizador De Cubiertos Olas Negro",
+            ["Hogar, Muebles y Jardín", "Cocina", "Organizadores de Cubiertos"])
+        palabras = claves.split()
+        self.assertIn("cocina", palabras)
+        for fuera in ("organizador", "cubiertos", "obsequios", "de", "y"):
+            self.assertNotIn(fuera, palabras)
+        self.assertEqual(len(palabras), len(set(palabras)))
+        largo = borrador.palabras_clave("", "", ["palabra" + "x" * 20 + str(i) for i in range(40)])
+        self.assertLess(len(largo.encode("utf-8")), 250)
+
+
+# --------------------------------------------- fotos, medidas, SKU, armar
+
+def _attr(id_, valor):
+    return {"id": id_, "value_name": valor}
+
+
+OLAS_ITEM = {
+    "id": "MLM3674350731", "title": OLAS_TITULO, "price": 209, "original_price": None,
+    "category_id": "MLM190943",
+    "attributes": [_attr("BRAND", "Savia Raiz"), _attr("COLOR", "Negro"), _attr("MATERIAL", "PLA"),
+                   _attr("COMPARTMENTS_NUMBER", "3"), _attr("DEPTH", "8 cm"), _attr("WIDTH", "8 cm"),
+                   _attr("HEIGHT", "10 cm"), _attr("SELLER_PACKAGE_HEIGHT", "20 cm"),
+                   _attr("SELLER_PACKAGE_LENGTH", "11 cm"), _attr("SELLER_PACKAGE_WIDTH", "16 cm"),
+                   _attr("SELLER_PACKAGE_WEIGHT", "198 g")],
+    "pictures": [{"id": f"F{i}", "url": f"http://http2.mlstatic.com/D_{i}0085-MLM1_102026-O.jpg"}
+                 for i in range(1, 6)],
+    "variations": [],
+}
+CATEGORIAS = json.loads((Path(__file__).resolve().parent.parent / "categorias.json")
+                        .read_text(encoding="utf-8"))
+COSTOS = {"precio_kg": 167.0, "paquete_activo": 0, "paquetes": [
+    {"nombre": "Paquetería", "elementos": [{"costo_compra": 16.38, "unidades": 1}]}]}
+
+
+class Armado(unittest.TestCase):
+
+    def ctx(self, **extra):
+        base = {"categorias": CATEGORIAS, "pesos": {}, "costos": COSTOS,
+                "publicadas": {}, "skus": set(), "ruta_categoria": ["Cocina"], "esquema": None}
+        base.update(extra)
+        return base
+
+    def test_categorias(self):
+        self.assertEqual(CATEGORIAS["marca"], "Generic")
+        self.assertEqual(len(CATEGORIAS["categorias"]), 9)
+        self.assertEqual(CATEGORIAS["categorias"]["MLM190943"]["tipo_producto"], "CADDY")
+        self.assertTrue(CATEGORIAS["categorias"]["MLM190943"]["confirmado"])
+
+    def test_fotos_completas_en_orden(self):
+        principal, otras, avisos = borrador.fotos(OLAS_ITEM)
+        self.assertEqual(principal, "https://http2.mlstatic.com/D_10085-MLM1_102026-F.jpg")
+        self.assertEqual(otras, [f"https://http2.mlstatic.com/D_{i}0085-MLM1_102026-F.jpg"
+                                 for i in range(2, 6)])
+        self.assertEqual(avisos, [])
+
+    def test_mas_de_nueve_fotos(self):
+        item = dict(OLAS_ITEM, pictures=OLAS_ITEM["pictures"] * 3)
+        principal, otras, avisos = borrador.fotos(item)
+        self.assertEqual(len(otras), 8)
+        self.assertIn("15 fotos", avisos[0])
+
+    def test_variacion_solo_sus_fotos(self):
+        var = {"id": 77, "picture_ids": ["F3", "F1"],
+               "attribute_combinations": [{"id": None, "value_name": "Gris"}], "price": 199}
+        principal, otras, _ = borrador.fotos(OLAS_ITEM, var)
+        self.assertIn("D_30085", principal)
+        self.assertEqual(len(otras), 1)
+        self.assertEqual(borrador.color(OLAS_ITEM, var), "Gris")
+        self.assertEqual(borrador.precio(OLAS_ITEM, var), 199.0)
+
+    def test_medidas(self):
+        m = borrador.medidas(OLAS_ITEM, 105.1)
+        self.assertEqual(m["paquete"], {"largo_cm": 20.0, "ancho_cm": 16.0, "alto_cm": 11.0,
+                                        "peso_g": 198.0})
+        self.assertEqual(m["articulo"], {"frente_cm": 8.0, "fondo_cm": 8.0, "alto_cm": 10.0,
+                                         "peso_g": 105.1})
+        item = dict(OLAS_ITEM, attributes=[_attr("LENGTH", "196 mm"), _attr("WIDTH", "7.8 cm"),
+                                           _attr("HEIGHT", "10.2 cm")])
+        a = borrador.medidas(item)["articulo"]
+        self.assertEqual((a["frente_cm"], a["fondo_cm"], a["alto_cm"]), (19.6, 7.8, 10.2))
+
+    def test_precio_original_gana(self):
+        self.assertEqual(borrador.precio(dict(OLAS_ITEM, price=179, original_price=209)), 209.0)
+
+    def test_costo_como_el_catalogo(self):
+        self.assertEqual(borrador.costo(105.1, COSTOS), 33.93)
+        self.assertIsNone(borrador.costo(None, COSTOS))
+
+    def test_pesos_del_catalogo(self):
+        cat = {"a.3mf": {"link": "https://vendedores…/MLM5469890250/modificar", "peso_g": 134.0,
+                         "paquete": 0}, "b.3mf": {"peso_g": 18.0}}
+        self.assertEqual(borrador.pesos_del_catalogo(cat), {"MLM5469890250": (134.0, 0)})
+
+    def test_sku(self):
+        usados = set()
+        a = borrador.sku("PCUB", "Organizador De Cubiertos Olas Negro", "Negro", usados)
+        self.assertEqual(a, "SR-PCUB-OLAS-NEG")
+        usados.add(a)
+        self.assertEqual(borrador.sku("PCUB", "Organizador De Cubiertos Olas Negro", "Negro", usados),
+                         "SR-PCUB-OLAS-NEG-2")
+        # Sin palabra distintiva: los últimos dígitos del MLM, no el color.
+        self.assertEqual(borrador.sku("PCON", "Organizador De Control Remoto Negro", "Negro",
+                                      set(), "MLM5556026256"), "SR-PCON-6256-NEG")
+        self.assertEqual(borrador.sku("PLAP", "Portalapices Moderno Diseño Geometrico negro",
+                                      "Geometrico negro", set()), "SR-PLAP-GEOMETRICO-NEG")
+
+    def test_armar_el_olas(self):
+        pub = {"5Z-W3LH-N087": {"mlm": "MLM3674350731", "variacion": None}}
+        br = borrador.armar(OLAS_ITEM, OLAS_DESCRIPCION,
+                            self.ctx(publicadas=pub, pesos={"MLM3674350731": (105.1, None)}))
+        self.assertEqual(br["sku"], "5Z-W3LH-N087")
+        self.assertEqual(br["titulo"], "Organizador De Cubiertos Olas Negro")
+        self.assertEqual(br["tipo_producto"], "CADDY")
+        self.assertNotIn("tipo_producto", br["por_revisar"])     # categoría confirmada
+        self.assertEqual(br["atributos"]["brand"], "Generic")
+        self.assertEqual(br["atributos"]["material"], "Plástico")
+        self.assertEqual(br["atributos"]["number_of_compartments"], 3)
+        self.assertEqual(br["costo_ref"], 33.93)
+        self.assertEqual(br["precio"], 209.0)
+        self.assertEqual(len(br["fotos"]["otras"]), 4)
+        self.assertTrue(br["vinetas"][2].startswith("MEDIDAS: 8 cm de frente"))
+        for campo in ("titulo", "vinetas", "precio", "envio", "foto_principal", "medidas"):
+            self.assertIn(campo, br["por_revisar"])
+        self.assertEqual(br["envio"], {"modo": None, "cantidad": None})
+        # Los que la vista previa del Olas pidió por reglas condicionales.
+        at = br["atributos"]
+        self.assertEqual(at["model_name"], "Organizador De Cubiertos Olas")
+        self.assertEqual(at["model_number"], "5Z-W3LH-N087")
+        self.assertEqual((at["number_of_items"], at["batteries_required"]), (1, False))
+        self.assertEqual(at["unit_count"]["type"]["value"], "unidad")
+        self.assertEqual((at["number_of_boxes"], at["part_number"]), (1, "5Z-W3LH-N087"))
+
+    def test_atributos_de_la_categoria(self):
+        item = dict(OLAS_ITEM, category_id="MLM194377")
+        br = borrador.armar(item, OLAS_DESCRIPCION, self.ctx())
+        self.assertEqual(br["atributos"]["recommended_browse_nodes"], "50603088011")
+        self.assertEqual(br["atributos"]["special_feature"], ["Compartimentado", "Ligero", "Compacto"])
+        a = borrador.payload(br)["attributes"]
+        self.assertEqual([x["value"] for x in a["special_feature"]],
+                         ["Compartimentado", "Ligero", "Compacto"])
+
+    def test_armar_sin_publicar_y_paquete_pesado(self):
+        item = dict(OLAS_ITEM, category_id="MLM455181",
+                    attributes=OLAS_ITEM["attributes"][:-1] + [_attr("SELLER_PACKAGE_WEIGHT", "1.4 kg")])
+        br = borrador.armar(item, OLAS_DESCRIPCION, self.ctx())
+        self.assertEqual(br["sku"], "SR-DECO-OLAS-NEG")
+        self.assertIn("tipo_producto", br["por_revisar"])
+        self.assertTrue(any("1400 g" in a for a in br["avisos"]))
+
+    def test_armar_con_esquema(self):
+        cache = {"tipo": "CADDY", "esquema": {
+            "required": ["brand", "item_name", "item_shape"],
+            "properties": {
+                "brand": {}, "manufacturer": {}, "country_of_origin": {}, "condition_type": {},
+                "supplier_declared_dg_hz_regulation": {}, "color": {}, "item_name": {},
+                "item_shape": {"items": {"properties": {"value": {"enum": ["Ovalada"]}}}},
+                "material": {"items": {"properties": {"value": {"anyOf": [
+                    {"type": "string"}, {"enum": ["Plástico", "Metal"]}]}}}}}}}
+        br = borrador.armar(OLAS_ITEM, OLAS_DESCRIPCION, self.ctx(esquema=cache))
+        self.assertNotIn("number_of_compartments", br["atributos"])   # el tipo no lo tiene
+        self.assertIsNone(br["atributos"]["item_shape"])
+        self.assertIn("atributo:item_shape", br["por_revisar"])
+        self.assertNotIn("item_name", br["atributos"])               # lo pone payload()
+
+
+# ------------------------------------------------ payload, huella, estado
+
+class Payload(unittest.TestCase):
+
+    def setUp(self):
+        self.br = borrador.armar(OLAS_ITEM, OLAS_DESCRIPCION, {"categorias": CATEGORIAS})
+
+    def test_obligatorios_de_caddy(self):
+        p = borrador.payload(self.br)
+        self.assertEqual(p["productType"], "CADDY")
+        self.assertEqual(p["requirements"], "LISTING")
+        for campo in ("brand", "bullet_point", "country_of_origin", "item_name",
+                      "product_description", "supplier_declared_dg_hz_regulation"):
+            self.assertIn(campo, p["attributes"], campo)
+        self.assertEqual(p["attributes"]["item_name"],
+                         [{"value": "Organizador De Cubiertos Olas Negro",
+                           "marketplace_id": "A1AM78C64UM0Y8", "language_tag": "es_MX"}])
+        self.assertEqual(len(p["attributes"]["bullet_point"]), 5)
+        self.assertEqual(p["attributes"]["supplier_declared_has_product_identifier_exemption"][0]
+                         ["value"], True)
+        self.assertEqual(p["attributes"]["main_product_image_locator"][0]["media_location"],
+                         self.br["fotos"]["principal"])
+        self.assertIn("other_product_image_locator_4", p["attributes"])
+        self.assertEqual(p["attributes"]["purchasable_offer"][0]["our_price"],
+                         [{"schedule": [{"value_with_tax": 209.0}]}])
+        self.assertEqual(p["attributes"]["skip_offer"][0]["value"], False)
+
+    def test_language_tag_segun_esquema(self):
+        cache = {"esquema": {"properties": {
+            "item_name": {"items": {"properties": {"value": {}, "language_tag": {},
+                                                   "marketplace_id": {}}}},
+            "country_of_origin": {"items": {"properties": {"value": {}, "marketplace_id": {}}}},
+            "brand": {"items": {"properties": {"value": {}, "language_tag": {}}}}}}}
+        a = borrador.payload(self.br, cache)["attributes"]
+        self.assertEqual(a["country_of_origin"], [{"value": "MX", "marketplace_id": "A1AM78C64UM0Y8"}])
+        self.assertEqual(a["brand"], [{"value": "Generic", "language_tag": "es_MX"}])
+        self.assertNotIn("list_price", a)          # el esquema mínimo no lo tiene
+
+    def test_envio(self):
+        self.br["envio"] = {"modo": "FBA", "cantidad": 7}
+        fa = borrador.payload(self.br)["attributes"]["fulfillment_availability"]
+        self.assertEqual(fa, [{"fulfillment_channel_code": "AMAZON_NA",
+                               "marketplace_id": "A1AM78C64UM0Y8"}])
+        self.br["envio"] = {"modo": "propio", "cantidad": 10}
+        fa = borrador.payload(self.br)["attributes"]["fulfillment_availability"][0]
+        self.assertEqual((fa["fulfillment_channel_code"], fa["quantity"]), ("DEFAULT", 10))
+        self.br["envio"] = {"modo": "propio", "cantidad": None}
+        with self.assertRaises(borrador.ErrorBorrador):
+            borrador.payload(self.br)
+        self.br["envio"] = {"modo": None, "cantidad": None}
+        self.assertNotIn("fulfillment_availability", borrador.payload(self.br)["attributes"])
+
+    def test_medidas_y_none(self):
+        self.br["medidas"]["articulo"].update(frente_cm=19.6, fondo_cm=7.8, alto_cm=10.2, peso_g=105.1)
+        self.br["atributos"]["item_shape"] = None
+        a = borrador.payload(self.br)["attributes"]
+        self.assertEqual(a["item_depth_width_height"][0]["width"], {"unit": "centimeters", "value": 19.6})
+        self.assertEqual(a["item_weight"][0]["value"], 105.1)
+        self.assertEqual(a["item_package_weight"][0], {"unit": "grams", "value": 198.0,
+                                                       "marketplace_id": "A1AM78C64UM0Y8"})
+        self.assertNotIn("item_shape", a)
+
+    def test_fotos_excluidas(self):
+        fuera = self.br["fotos"]["otras"][0]
+        self.br["fotos"]["excluidas"] = [fuera]
+        a = borrador.payload(self.br)["attributes"]
+        urls = [a[k][0]["media_location"] for k in a if k.startswith("other_product")]
+        self.assertNotIn(fuera, urls)
+        self.assertEqual(len(urls), 3)
+
+    def test_sin_tipo(self):
+        self.br["tipo_producto"] = None
+        with self.assertRaises(borrador.ErrorBorrador):
+            borrador.payload(self.br)
+
+    def test_huella(self):
+        h = borrador.huella(self.br)
+        reordenado = dict(reversed(list(self.br.items())))
+        self.assertEqual(borrador.huella(reordenado), h)
+        self.br["avisos"].append("otro aviso")          # no es contenido
+        self.assertEqual(borrador.huella(self.br), h)
+        self.br["titulo"] += " Nuevo"
+        self.assertNotEqual(borrador.huella(self.br), h)
+
+    def test_estado(self):
+        self.assertEqual(borrador.estado(self.br), "borrador")
+        self.br["validacion"] = {"status": "VALID", "huella": borrador.huella(self.br)}
+        self.assertEqual(borrador.estado(self.br), "validado")
+        self.br["precio"] = 249
+        self.assertEqual(borrador.estado(self.br), "borrador")
+        self.br["publicado"] = {"fecha": "2026-10-27"}
+        self.assertEqual(borrador.estado(self.br), "publicado")
+
+    def test_cambios_en_ml(self):
+        self.assertEqual(borrador.cambios_en_ml(self.br, OLAS_ITEM), [])
+        cambiado = dict(OLAS_ITEM, title="Organizador De Cubiertos Olas Negro", price=229)
+        campos = [c for c, _, _ in borrador.cambios_en_ml(self.br, cambiado)]
+        self.assertEqual(campos, ["titulo", "precio"])
+
+
+# ------------------------------------------------------------- fotos en red
+
+def _jpeg(ancho, alto):
+    """Encabezado mínimo de JPEG: SOI, un APP0 y el SOF0 con el tamaño."""
+    app0 = b"\xff\xe0" + struct.pack(">H", 16) + b"JFIF\x00" + b"\x00" * 9
+    sof0 = b"\xff\xc0" + struct.pack(">HBHH", 17, 8, alto, ancho) + b"\x03" + b"\x00" * 9
+    return b"\xff\xd8" + app0 + sof0
+
+
+def _png(ancho, alto):
+    return b"\x89PNG\r\n\x1a\n" + b"\x00\x00\x00\rIHDR" + struct.pack(">II", ancho, alto)
+
+
+def _webp_vp8x(ancho, alto):
+    return (b"RIFF\x00\x00\x00\x00WEBPVP8X" + b"\x00" * 8
+            + (ancho - 1).to_bytes(3, "little") + (alto - 1).to_bytes(3, "little"))
+
+
+class _RespuestaFoto(_Respuesta):
+    def __init__(self, cuerpo, tipo="image/jpeg"):
+        super().__init__(cuerpo)
+        self.headers = {"Content-Type": tipo}
+
+    def read(self, n=None):
+        return self._cuerpo
+
+
+class Fotos(unittest.TestCase):
+
+    def setUp(self):
+        self.guardado = borrador._abrir
+
+    def tearDown(self):
+        borrador._abrir = self.guardado
+
+    def servir(self, cuerpo, tipo="image/jpeg"):
+        self.pedidos = []
+
+        def abrir(pedido, timeout=None):
+            self.pedidos.append(pedido)
+            if isinstance(cuerpo, Exception):
+                raise cuerpo
+            return _RespuestaFoto(cuerpo, tipo)
+        borrador._abrir = abrir
+
+    def test_tamanos(self):
+        self.assertEqual(borrador.medidas_imagen(_jpeg(1200, 896)), (1200, 896))
+        self.assertEqual(borrador.medidas_imagen(_png(1024, 768)), (1024, 768))
+        self.assertEqual(borrador.medidas_imagen(_webp_vp8x(1500, 1000)), (1500, 1000))
+        self.assertIsNone(borrador.medidas_imagen(b"<html>"))
+
+    def test_foto_grande(self):
+        self.servir(_jpeg(1200, 896))
+        r = borrador.revisar_foto("https://x/D_1-F.jpg")
+        self.assertEqual((r["ok"], r["ancho"], r["alto"], r["aviso"]), (True, 1200, 896, None))
+        self.assertEqual(self.pedidos[0].get_header("Range"), "bytes=0-65535")
+
+    def test_foto_chica(self):
+        self.servir(_jpeg(500, 373))
+        r = borrador.revisar_foto("https://x/D_1-O.jpg")
+        self.assertTrue(r["ok"])
+        self.assertIn("500×373", r["aviso"])
+
+    def test_no_es_imagen(self):
+        self.servir(b"<html>no</html>", "text/html")
+        self.assertFalse(borrador.revisar_foto("https://x/pagina")["ok"])
+
+    def test_no_responde(self):
+        self.servir(urllib.error.URLError("sin red"))
+        r = borrador.revisar_foto("https://x/D_1-F.jpg")
+        self.assertFalse(r["ok"])
+        self.assertIn("No responde", r["aviso"])
+
+
+# ----------------------------------------------------------- comandos
+
+class Comandos(unittest.TestCase):
+    """publicar.py contra una carpeta temporal en lugar de ~/.catalogo3d."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        raiz = Path(self._tmp.name)
+        self.guardado = (publicar.CARPETA, publicar.BORRADORES, publicar.PUBLICADAS)
+        publicar.CARPETA = raiz / "amazon"
+        publicar.BORRADORES = publicar.CARPETA / "borradores"
+        publicar.PUBLICADAS = publicar.CARPETA / "publicadas.json"
+        self.br = borrador.armar(OLAS_ITEM, OLAS_DESCRIPCION, {"categorias": CATEGORIAS})
+        publicar.guardar_privado(publicar.ruta_borrador("MLM3674350731"), self.br)
+
+    def tearDown(self):
+        publicar.CARPETA, publicar.BORRADORES, publicar.PUBLICADAS = self.guardado
+        self._tmp.cleanup()
+
+    def correr(self, *argv):
+        salida = io.StringIO()
+        viejo, sys.stdout = sys.stdout, salida
+        try:
+            codigo = publicar.main(list(argv))
+        finally:
+            sys.stdout = viejo
+        return codigo, salida.getvalue()
+
+    def test_permisos(self):
+        ruta = publicar.ruta_borrador("MLM3674350731")
+        self.assertEqual(os.stat(ruta).st_mode & 0o777, 0o600)
+        self.assertEqual(os.stat(publicar.BORRADORES).st_mode & 0o777, 0o700)
+
+    def test_aprobar(self):
+        codigo, texto = self.correr("aprobar", "MLM3674350731", "titulo", "precio")
+        self.assertEqual(codigo, 0)
+        br = publicar.leer_borrador("MLM3674350731")
+        self.assertNotIn("titulo", br["por_revisar"])
+        self.assertNotIn("precio", br["por_revisar"])
+
+    def test_aprobar_campo_inexistente_no_cambia(self):
+        antes = publicar.ruta_borrador("MLM3674350731").read_text()
+        codigo, texto = self.correr("aprobar", "MLM3674350731", "titulo", "inventado")
+        self.assertEqual(codigo, 1)
+        self.assertIn("inventado", texto)
+        self.assertEqual(publicar.ruta_borrador("MLM3674350731").read_text(), antes)
+
+    def test_json_roto(self):
+        publicar.ruta_borrador("MLM1").write_text('{\n "titulo": "x",\n', encoding="utf-8")
+        with self.assertRaises(publicar.ErrorPublicador) as e:
+            publicar.leer_borrador("MLM1")
+        self.assertIn("línea 3", str(e.exception))
+
+    def test_sin_borrador(self):
+        with self.assertRaises(publicar.ErrorPublicador) as e:
+            publicar.leer_borrador("MLM999")
+        self.assertIn("armar MLM999", str(e.exception))
+
+    def test_publicadas_arranca_con_el_olas(self):
+        pub = publicar.publicadas()
+        self.assertEqual(pub["5Z-W3LH-N087"]["mlm"], "MLM3674350731")
+        self.assertTrue(publicar.PUBLICADAS.exists())
+
+    def test_claves(self):
+        self.assertEqual(publicar.separar("mlm123-456"), ("MLM123", "456"))
+        self.assertEqual(publicar.separar("MLM123"), ("MLM123", None))
+        item = {"id": "MLM1", "variations": [{"id": 7}, {"id": 8}]}
+        self.assertEqual(publicar.claves_de_item(item), ["MLM1-7", "MLM1-8"])
+        self.assertEqual(publicar.claves_de_item({"id": "MLM2"}), ["MLM2"])
+
+
+# --------------------------------------------- validar y comparar (sin red)
+
+class Validar(Comandos):
+
+    def setUp(self):
+        super().setUp()
+        self.guardado_sp = (sp_api.pedir, sp_api._cred, esquema.esquema)
+        sp_api._cred = dict(CRED_FALSAS)
+        esquema.esquema = lambda tipo: {"tipo": tipo, "esquema": {"properties": {}}}
+        self.llamadas = []
+
+    def tearDown(self):
+        sp_api.pedir, sp_api._cred, esquema.esquema = self.guardado_sp
+        super().tearDown()
+
+    def amazon(self, respuesta):
+        def pedir(metodo, ruta, params=None, cuerpo=None):
+            self.llamadas.append((metodo, ruta, params, cuerpo))
+            return respuesta
+        sp_api.pedir = pedir
+
+    def test_valido_guarda_huella(self):
+        self.amazon({"status": "VALID", "issues": []})
+        codigo, texto = self.correr("validar", "MLM3674350731")
+        self.assertEqual(codigo, 0)
+        metodo, ruta, params, cuerpo = self.llamadas[0]
+        self.assertEqual(metodo, "PUT")
+        self.assertEqual(params["mode"], "VALIDATION_PREVIEW")
+        self.assertTrue(ruta.endswith("/A1PRUEBA0000XX/SR-PCUB-OLAS-NEG"))
+        self.assertEqual(cuerpo["productType"], "CADDY")
+        br = publicar.leer_borrador("MLM3674350731")
+        self.assertEqual(borrador.estado(br), "validado")
+        br["titulo"] = "Otro"
+        self.assertEqual(borrador.estado(br), "borrador")
+
+    def test_invalido_y_gtin(self):
+        self.amazon({"status": "INVALID", "issues": [
+            {"code": "8541", "severity": "ERROR", "message": "Falta el GTIN",
+             "attributeNames": ["externally_assigned_product_identifier"]}]})
+        codigo, texto = self.correr("validar", "MLM3674350731")
+        self.assertEqual(codigo, 1)
+        self.assertIn("exención de GTIN", texto)
+        self.assertEqual(borrador.estado(publicar.leer_borrador("MLM3674350731")), "borrador")
+
+    def test_error_local_no_llama_a_amazon(self):
+        esquema.esquema = lambda tipo: {"tipo": tipo, "esquema": {
+            "required": ["batteries_required", "algo_que_falta"], "properties": {}}}
+        self.amazon({"status": "VALID"})
+        codigo, texto = self.correr("validar", "MLM3674350731")
+        self.assertEqual(codigo, 1)
+        self.assertIn("algo_que_falta", texto)
+        self.assertEqual(self.llamadas, [])
+
+    def test_issue_de_imagen(self):
+        self.assertTrue(publicar.es_issue_imagen(
+            {"message": "La imagen principal no tiene fondo blanco",
+             "attributeNames": ["main_product_image_locator"]}))
+        self.assertFalse(publicar.es_issue_gtin({"message": "Falta el color", "attributeNames": ["color"]}))
+
+    def test_diferencias(self):
+        amazon = {"color": [{"value": "Plateado", "language_tag": "es_MX", "marketplace_id": "X"}],
+                  "number_of_compartments": [{"value": 6, "marketplace_id": "X"}],
+                  "brand": [{"value": "Generic", "language_tag": "es_MX"}],
+                  "capacity": [{"unit": "liters", "value": 2.5}]}
+        propuesto = {"color": [{"value": "Negro", "language_tag": "es_MX"}],
+                     "number_of_compartments": [{"value": 3}],
+                     "brand": [{"value": "Generic", "marketplace_id": "Y"}]}
+        filas = publicar.diferencias(amazon, propuesto)
+        self.assertEqual([f[0] for f in filas], ["capacity", "color", "number_of_compartments"])
+        self.assertEqual(filas[1][1:], ("Plateado", "Negro"))
+        self.assertIsNone(filas[0][2])
+
+
+# ------------------------------------------------------ publicar (sin red)
+
+class Publicar(Comandos):
+
+    def setUp(self):
+        super().setUp()
+        self.guardado_sp = (sp_api.pedir, sp_api._cred, esquema.esquema)
+        sp_api._cred = dict(CRED_FALSAS)
+        esquema.esquema = lambda tipo: {"tipo": tipo, "esquema": {"properties": {}}}
+        self.llamadas = []
+        self.existe = None          # atributos del SKU en Amazon, o None
+        self.respuestas = {"PUT": {"status": "ACCEPTED", "submissionId": "s1", "identifiers": [
+            {"identifiers": [{"identifierType": "ASIN", "identifier": "B0PRUEBA01"}]}]},
+            "PATCH": {"status": "VALID"}}
+
+        def pedir(metodo, ruta, params=None, cuerpo=None):
+            self.llamadas.append((metodo, dict(params or {})))
+            if metodo == "GET":
+                if self.existe is None:
+                    raise sp_api.ErrorSP(f"GET {ruta} -> 404: NOT_FOUND")
+                return {"summaries": [{"asin": "B0X"}], "attributes": self.existe}
+            r = dict(self.respuestas[metodo])
+            if metodo == "PATCH" and "mode" not in (params or {}):
+                r["status"] = "ACCEPTED"
+            return r
+        sp_api.pedir = pedir
+
+    def tearDown(self):
+        sp_api.pedir, sp_api._cred, esquema.esquema = self.guardado_sp
+        super().tearDown()
+
+    def escrituras(self):
+        return [m for m, p in self.llamadas if m in ("PUT", "PATCH") and "mode" not in p]
+
+    def listo(self):
+        br = publicar.leer_borrador("MLM3674350731")
+        br["por_revisar"] = []
+        br["envio"] = {"modo": "propio", "cantidad": 5}
+        br["validacion"] = {"status": "VALID", "huella": borrador.huella(br)}
+        publicar.guardar_privado(publicar.ruta_borrador("MLM3674350731"), br)
+        return br
+
+    def test_sin_validar_no_toca_la_red(self):
+        codigo, _ = self.correr("publicar", "MLM3674350731", "--confirmo", "SR-PCUB-OLAS-NEG")
+        self.assertEqual(codigo, 1)
+        self.assertEqual(self.llamadas, [])
+
+    def test_por_revisar_no_toca_la_red(self):
+        br = self.listo()
+        br["por_revisar"] = ["precio"]
+        publicar.guardar_privado(publicar.ruta_borrador("MLM3674350731"), br)
+        codigo, _ = self.correr("publicar", "MLM3674350731", "--confirmo", br["sku"])
+        self.assertEqual((codigo, self.llamadas), (1, []))
+
+    def test_huella_vieja_no_toca_la_red(self):
+        br = self.listo()
+        br["precio"] = 249               # cambió después de validar
+        publicar.guardar_privado(publicar.ruta_borrador("MLM3674350731"), br)
+        codigo, _ = self.correr("publicar", "MLM3674350731", "--confirmo", br["sku"])
+        self.assertEqual((codigo, self.llamadas), (1, []))
+
+    def test_otro_sku_no_toca_la_red(self):
+        self.listo()
+        codigo, _ = self.correr("publicar", "MLM3674350731", "--confirmo", "5Z-W3LH-N087")
+        self.assertEqual((codigo, self.llamadas), (1, []))
+
+    def test_sin_confirmo_solo_muestra(self):
+        self.listo()
+        codigo, texto = self.correr("publicar", "MLM3674350731")
+        self.assertEqual(codigo, 0)
+        self.assertEqual(self.escrituras(), [])
+        self.assertIn("--confirmo SR-PCUB-OLAS-NEG", texto)
+
+    def test_con_confirmo_publica_y_registra(self):
+        self.listo()
+        codigo, texto = self.correr("publicar", "MLM3674350731", "--confirmo", "SR-PCUB-OLAS-NEG")
+        self.assertEqual(codigo, 0)
+        self.assertEqual(self.escrituras(), ["PUT"])
+        put = [p for m, p in self.llamadas if m == "PUT"][0]
+        self.assertNotIn("identifiers", put["includedData"])   # 400 fuera de la vista previa
+        reg = publicar.publicadas()["SR-PCUB-OLAS-NEG"]
+        self.assertEqual((reg["mlm"], reg["asin"], reg["submission_id"]),
+                         ("MLM3674350731", "B0PRUEBA01", "s1"))
+        self.assertEqual(borrador.estado(publicar.leer_borrador("MLM3674350731")), "publicado")
+        # Una segunda vez ya no publica.
+        codigo, _ = self.correr("publicar", "MLM3674350731", "--confirmo", "SR-PCUB-OLAS-NEG")
+        self.assertEqual(codigo, 1)
+        self.assertEqual(self.escrituras(), ["PUT"])
+
+    def test_sku_existente_no_se_reemplaza(self):
+        self.listo()
+        self.existe = {"color": [{"value": "Plateado"}]}
+        codigo, texto = self.correr("publicar", "MLM3674350731", "--confirmo", "SR-PCUB-OLAS-NEG")
+        self.assertEqual(codigo, 0)
+        self.assertEqual(self.escrituras(), [])
+        self.assertIn("ya existe", texto)
+
+    def test_campos_vista_previa_y_luego_patch(self):
+        self.existe = {"color": [{"value": "Plateado"}]}
+        codigo, texto = self.correr("publicar", "MLM3674350731", "--campos", "color")
+        self.assertEqual(codigo, 0)
+        self.assertEqual(self.escrituras(), [])
+        self.assertIn(("PATCH", "VALIDATION_PREVIEW"),
+                      [(m, p.get("mode")) for m, p in self.llamadas])
+        codigo, _ = self.correr("publicar", "MLM3674350731", "--campos", "color",
+                                "--confirmo", "SR-PCUB-OLAS-NEG")
+        self.assertEqual((codigo, self.escrituras()), (0, ["PATCH"]))
+
+    def test_activar(self):
+        br = self.listo()
+        self.existe = {"color": [{"value": "Negro"}]}
+        codigo, texto = self.correr("activar", "MLM3674350731")
+        self.assertEqual((codigo, self.escrituras()), (0, []))
+        codigo, _ = self.correr("activar", "MLM3674350731", "--confirmo", br["sku"])
+        self.assertEqual((codigo, self.escrituras()), (0, ["PATCH"]))
+        self.llamadas.clear()
+        codigo, _ = self.correr("activar", "MLM3674350731", "--confirmo", "OTRO")
+        self.assertEqual((codigo, self.llamadas), (1, []))
+
+    def test_campo_que_el_borrador_no_tiene(self):
+        self.existe = {"capacity": [{"value": 2.5}]}
+        codigo, texto = self.correr("publicar", "MLM3674350731", "--campos", "capacity",
+                                    "--confirmo", "SR-PCUB-OLAS-NEG")
+        self.assertEqual(codigo, 1)
+        self.assertEqual(self.escrituras(), [])
+
+
+# ----------------------------------------------------------------- precios
+
+class Precios(unittest.TestCase):
+    REGLAS = {"minimo": 159, "maximo": 259, "escalones_b2b": [[5, 0.10], [10, 0.15], [25, 0.20]]}
+
+    def test_escalones(self):
+        self.assertEqual(borrador.escalones(209, self.REGLAS), [(5, 188), (10, 178), (25, 167)])
+        # Nunca debajo del mínimo: 198 × 0.8 = 158.4 → 159.
+        self.assertEqual(borrador.escalones(198, self.REGLAS)[-1], (25, 159))
+
+    def test_ofertas(self):
+        publico, empresas = borrador.ofertas(209, self.REGLAS)
+        self.assertEqual(publico["audience"], "ALL")
+        self.assertEqual(publico["minimum_seller_allowed_price"], [{"schedule": [{"value_with_tax": 159}]}])
+        self.assertEqual(publico["maximum_seller_allowed_price"], [{"schedule": [{"value_with_tax": 259}]}])
+        self.assertEqual(empresas["audience"], "B2B")
+        niveles = empresas["quantity_discount_plan"][0]["schedule"][0]["levels"]
+        self.assertEqual(niveles[0], {"lower_bound": 5, "value": 188.0})
+        self.assertEqual(len(borrador.ofertas(209)), 1)          # sin reglas: solo público
+
+    def test_precio_fuera_de_limites(self):
+        with self.assertRaises(borrador.ErrorBorrador):
+            borrador.ofertas(149, self.REGLAS)
+        with self.assertRaises(borrador.ErrorBorrador):
+            borrador.ofertas(299, self.REGLAS)
+
+    def test_payload_con_precios(self):
+        br = borrador.armar(OLAS_ITEM, OLAS_DESCRIPCION, {"categorias": CATEGORIAS})
+        self.assertEqual(br["precios"]["minimo"], 159)
+        po = borrador.payload(br)["attributes"]["purchasable_offer"]
+        self.assertEqual([o["audience"] for o in po], ["ALL", "B2B"])
+        self.assertTrue(all(o["marketplace_id"] == "A1AM78C64UM0Y8" for o in po))
+
+    def test_combinar_conserva_lo_de_amazon(self):
+        actuales = [{"audience": "ALL", "currency": "MXN", "our_price": [1],
+                     "automated_pricing_merchandising_rule_plan": ["regla"]},
+                    {"audience": "B2B", "quantity_discount_plan": ["viejo"]}]
+        nuevas = borrador.ofertas(209, self.REGLAS)
+        c = publicar.combinar_ofertas(actuales, nuevas)
+        self.assertEqual(c[0]["automated_pricing_merchandising_rule_plan"], ["regla"])
+        self.assertEqual(c[0]["our_price"], [{"schedule": [{"value_with_tax": 209}]}])
+        self.assertNotEqual(c[1]["quantity_discount_plan"], ["viejo"])
+
+
+if __name__ == "__main__":
+    unittest.main()
