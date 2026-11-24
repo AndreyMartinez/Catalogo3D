@@ -110,3 +110,39 @@ skill, sección 1: "si viene de `generadores/`, usar `crear.py`").
 - Si el gramaje real de Bambu (tras Rebanar) se aleja de 147 g por pieza, es por el
   gap infill; el CLI no reporta peso (sale 0.00).
 - El catálogo ahora verá 3 piezas por archivo: el gramaje por pieza = total / 3.
+
+## 2026-11-24 (v4) — "me están quedando como hilos sueltos o salidos por dentro y por fuera … y que se sienta un poquito más pesadita"
+
+**Qué había (v3):** el usuario la reescaló a mano en Bambu el 10-26 (×0.950 / ×0.973 / ×0.872 →
+186×76×89 mm) y al guardar se perdió el perfil embebido de 09-24: quedó «0.20mm Standard @BBL P2S»
+puro (2 perímetros clásicos, 15 % grid, costura alineada, 220 °C) y **sin**
+`different_settings_to_system`. La pared (1.7 × escala ≈ 1.6 mm) no cabía en 2 hilos: el hueco
+del medio se llenaba con relleno disperso + relleno de hueco (17 min por plato) → tramitos y saltos
+que dejan hilos, y la pared iba medio hueca (113 g laminados contra 125 g de pared llena).
+
+**Cambios v3 → v4:**
+- Malla regenerada con el generador a la medida del escalado (no estirada): `ancho` 152, `fondo`
+  61.3, `alto` 89, `divisor_alto` 88.5, `onda_paso` 16.07 (= 16.92 × 0.95), **`pared` 1.7 → 1.9**
+  (`pared_forma` sigue); 186.4×76.3×89.2 mm, cerrada, 512k triángulos. Precheck aprobado.
+- Perfil (todas en `different_settings_to_system`): `wall_generator` classic → **arachne**,
+  `wall_loops` 2 → **4** (pared llena, sin relleno ni relleno de hueco), `bottom_shell_layers`
+  3 → 5 (piso de 2 mm macizo), `seam_position` aligned → back, `reduce_crossing_wall` 0 → **1**
+  (los saltos van por dentro de la pared, no cruzan el compartimento), `resolution` 0.012 → 0.05,
+  `nozzle_temperature` 220 → **210**.
+- 3 por plato, mismas posiciones Y (44.9 / 128 / 211.1, 6.8 mm entre piezas).
+
+| CLI Bambu, plato de 3 | v3 | v4 |
+|---|---|---|
+| Tiempo del plato | 6 h 32 | 7 h 41 |
+| Por pieza | 2 h 11 · 113.0 g | **2 h 34 · 129.3 g** |
+| Costo por pieza (180 $/kg + $13.96) | $34.30 | **$37.23** |
+| Relleno de hueco | 17 min | 0 min |
+| Retracciones del plato | 9 864 | 11 740 |
+
+Variantes probadas: sin `reduce_crossing_wall` 7 h 11 (los saltos vuelven a cruzar el aire);
+`wall_loops` 3 da lo mismo que 4 (Arachne reparte igual). Se quedó la de 7 h 41.
+`peso_g` de la tarjeta en `.catalogo3d_mercadolibre.json` 112 → 129.3.
+Respaldos: `.3mf.v3.bak`, `.png.v3.bak`.
+
+**Pendiente:** imprimir y ver si quedan hilos. Si sí: secar el filamento (50 °C 6–8 h), luego
+`retraction_length` 0.8 → 1.0. Si se vuelve a escalar a mano, regenerar con el generador.
