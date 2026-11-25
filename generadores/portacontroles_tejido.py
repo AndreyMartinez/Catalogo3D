@@ -13,6 +13,11 @@ ladito (~26 c/u); el celular gordo con funda va en el primero, recargado en
 diagonal. Esquinas de 8 en planta para que la curva no le coma lugar a los
 huecos de las puntas.
 
+v3 (11-24): llegó roto en bolsa de burbujas (pared, borde y divisores).
+Pared de 2.4 con 2 vueltas, labio engrosado por dentro, divisores de 3 con
+chaflán contra la pared; y de vuelta la curva en S, medida de la foto de la
+publicación de ML, con el alto a su proporción (120 sobre 152).
+
     python3 portacontroles_tejido.py --salida /ruta --nombre MiPieza
     python3 portacontroles_tejido.py --alto 100 --alto-bajo 58 --3mf
 
@@ -20,8 +25,9 @@ Por defecto escribe el STL y la miniatura, que es lo que pide el precheck.
 El .3mf solo con --3mf, ya con el visto bueno.
 
 El relieve va solo por fuera y nunca hunde: la cara de la pared es el valle
-y las costillas salen de ahí. El valle mide dos hilos de 0.62 (la regla de
-la estría, ver portacubiertos-oleaje-m), por dentro todo liso.
+y las costillas salen de ahí. Por dentro todo liso. El valle medía dos hilos
+de 0.62 (la regla de la estría, ver portacubiertos-oleaje-m); desde la v3,
+cuatro.
 """
 
 import argparse
@@ -38,18 +44,26 @@ from nucleo import exportar, malla as M, render   # noqa: E402
 DENSIDAD = 1.24          # g/cm³, PLA
 
 P = {
-    "ancho": 148.0,          # 46 + 47.7 + 47.8 por dentro, más pared y tabiques
+    "ancho": 150.0,          # 46 + 46.6 + 46.6 por dentro, más pared y tabiques
                              # (v1: 126; v2 11-16, «más anchos y largos», para
                              # los controles gruesos de las opiniones 1★)
-    "fondo": 90.0,           # adentro 87.5: dos controles de ladito con
+    "fondo": 90.0,           # adentro 85.2: dos controles de ladito con
                              # holgura (v1: 72.5); 3 por plato con una girada
-    "redondeo": 8.0,         # radio de las esquinas en planta
-    "alto": 105.0,           # lado izquierdo
-    "alto_bajo": 60.0,       # lado derecho
-    "curva_desde": 0.18,     # fracción del ancho donde empieza a bajar…
-    "curva_hasta": 0.82,     # … y donde ya llegó abajo
-    "redondeo_borde": 14.0,  # medio largo del redondeo en cada quiebre
-    "valle": 1.24,           # pared en el valle de la costilla: 2 hilos
+    "redondeo": 11.0,        # radio de las esquinas en planta (v2: 8; la
+                             # esquina más abierta reparte el golpe)
+    "alto": 120.0,           # lado izquierdo (v3: proporción de la foto de
+                             # ML, 105 de alto por 128 de largo)
+    "alto_bajo": 70.0,       # lado derecho, 0.58 del alto como en la foto
+    "curva": "s",            # «s»: hombro, bajada empinada y panza (foto);
+                             # «recta»: diagonal con quiebres redondos (v1-v2)
+    "curva_desde": 0.14,     # fracción del ancho donde empieza a bajar…
+    "curva_hasta": 0.64,     # … y donde ya llegó abajo (v2 recta: .18 → .82)
+    "redondeo_borde": 14.0,  # medio largo del redondeo en cada quiebre (recta)
+    "valle": 2.4,            # pared en el valle de la costilla: 4 hilos de
+                             # 0.62 con 2 vueltas (v2: 1.24, llegó roto)
+    "labio_dentro": 1.6,     # el borde engorda hacia adentro…
+    "labio_alto": 3.0,       # … en esta franja de arriba, y baja a la pared
+    "labio_bajada": 4.0,     # en esta otra (volado de menos de 45°)
     "relieve": 1.2,          # lo que sale la costilla más abultada
     "paso": 2.8,             # entre costillas, sobre el contorno
     "cuenta": 2.8,           # entre cuentas, a lo alto
@@ -62,11 +76,13 @@ P = {
     "zoclo": 3.0,            # franja de abajo, cerrada también
     "chaflan": 0.6,          # pie de elefante
     "piso": 1.6,
-    "divisor": 2.0,          # grueso de los divisores
-    "baja_divisor": 10.0,    # cuánto quedan los divisores bajo el borde
+    "divisor": 3.0,          # grueso de los divisores (v2: 2.0, se rompió)
+    "filete": 3.0,           # chaflán cóncavo del divisor contra la pared
+    "baja_divisor": 4.0,     # cuánto quedan los divisores bajo el borde
+                             # (v2: 10; en la foto van casi al ras)
     "hueco_1": 46.0,         # celular gordo (~82) recargado en diagonal:
                              # 46 × 87.5 da 98.9 de diagonal
-    "hueco_2": 47.7,         # control grueso; lo que sobra a la derecha, igual
+    "hueco_2": 46.6,         # control grueso; lo que sobra a la derecha, igual
     "alza_1": 8.0,           # cuánto sube el piso de cada compartimento
     "alza_2": 14.0,
     "alza_3": 20.0,
@@ -115,13 +131,19 @@ class Contorno:
 
 
 def borde(p, x):
-    """Alto del labio en x: meseta alta, diagonal recta, meseta baja. Cada
-    quiebre se redondea con una parábola tangente a los dos tramos, así la
-    diagonal se lee como corte y no como ola."""
+    """Alto del labio en x: meseta alta, bajada, meseta baja.
+
+    «s» (v3, la foto de ML): medio coseno entre los dos quiebres; hombro
+    redondo arriba, la bajada más empinada a la mitad y panza cóncava abajo.
+    «recta» (v1-v2): diagonal con cada quiebre redondeado por una parábola
+    tangente a los dos tramos, que se lee como corte y no como ola."""
     w = p["ancho"]
     x0 = -w / 2 + p["curva_desde"] * w
     x1 = -w / 2 + p["curva_hasta"] * w
     alto, bajo = p["alto"], p["alto_bajo"]
+    if p["curva"] == "s":
+        t = min(1.0, max(0.0, (x - x0) / (x1 - x0)))
+        return bajo + (alto - bajo) * (0.5 + 0.5 * math.cos(math.pi * t))
     k = (alto - bajo) / (x1 - x0)
     e = min(p["redondeo_borde"], (x1 - x0) / 2)
     if x <= x0 - e:
@@ -176,7 +198,15 @@ def casco(p):
     tope = [borde(p, x) for _, x, _, _, _ in cols]
     capas = int(math.ceil(p["alto"] / p["grano"]))
     fr_ext = [k / capas for k in range(capas + 1)]
-    fr_int = [k / 16 for k in range(17)]
+    # Por dentro: la pared lisa hasta abajo del labio, y en la franja de
+    # arriba los anillos van por distancia al borde para engordarlo.
+    cuello = p["labio_alto"] + p["labio_bajada"]
+    pasos_labio = [cuello * (1 - k / 10) for k in range(11)]
+
+    def adentro(dz):
+        """Lo que se mete la cara de adentro a dz del borde."""
+        lleno = 1 - _suave((dz - p["labio_alto"]) / p["labio_bajada"])
+        return p["valle"] + p["labio_dentro"] * lleno
 
     m = M.Malla()
     ext, inte = [], []
@@ -187,11 +217,17 @@ def casco(p):
             d = relieve(p, s, z, tope[i], c.perimetro)
             aro.append(m.punto(x + nx * d, y + ny * d, z))
         ext.append(aro)
-    for fr in fr_int:
+    for k in range(16):
         aro = []
         for i, (s, x, y, nx, ny) in enumerate(cols):
-            z = p["piso"] + (tope[i] - p["piso"]) * fr
+            z = p["piso"] + (tope[i] - cuello - p["piso"]) * k / 16
             aro.append(m.punto(x - nx * p["valle"], y - ny * p["valle"], z))
+        inte.append(aro)
+    for dz in pasos_labio:
+        aro = []
+        for i, (s, x, y, nx, ny) in enumerate(cols):
+            e = adentro(dz)
+            aro.append(m.punto(x - nx * e, y - ny * e, tope[i] - dz))
         inte.append(aro)
     for k in range(len(ext) - 1):
         for i in range(n):
@@ -288,9 +324,24 @@ def divisores(p):
     x_int = -p["ancho"] / 2 + v
     xs = [x_int + p["hueco_1"] + g / 2,
           x_int + p["hueco_1"] + g + p["hueco_2"] + g / 2]
+    # A lo largo del tabique, más secciones cerca de la pared, donde se
+    # ensancha en un chaflán cóncavo (cuarto de círculo) que la amarra.
+    cara = p["fondo"] / 2 - v                  # cara de adentro de la pared
+    f = p["filete"]
+    ys = sorted({-medio_y, medio_y}
+                | {s * (cara - f * (1 - math.cos(math.pi / 2 * k / 6)))
+                   for k in range(7) for s in (-1, 1)})
+
+    def grueso(y):
+        d = cara - abs(y)
+        if d >= f:
+            return g
+        d = max(d, 0.0)
+        return g + 2 * (f - math.sqrt(max(0.0, f * f - (f - d) ** 2)))
+
     for xc in xs:
-        secs = [_seccion(xc, g, z0, cima(xc), lambda u, z, y=y: (u, y, z))
-                for y in (-medio_y, medio_y)]
+        secs = [_seccion(xc, grueso(y), z0, cima(xc),
+                         lambda u, z, y=y: (u, y, z)) for y in ys]
         piezas.append(_barrido(secs))
 
     c = Contorno(p["ancho"], p["fondo"], p["redondeo"])
@@ -370,6 +421,9 @@ LAMINADO = {"wall_loops": "1", "wall_generator": "arachne",
             # sostiene los techos de las losas: −19 g y −20 min por pieza.
             "z_hop": "0", "retraction_minimum_travel": "3",
             "sparse_infill_pattern": "lightning"}
+# v3 (11-24): llegó roto en bolsa de burbujas. Pared de 2.4 en el valle con
+# 2 vueltas por lado: 4 hilos macizos, sin relleno adentro de la pared.
+LAMINADO["wall_loops"] = "2"
 
 
 def embeber_ajustes(ruta, ajustes):

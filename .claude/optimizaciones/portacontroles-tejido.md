@@ -80,10 +80,55 @@ Respaldos: `Portacontroles_Tejido.{3mf,png,stl}.v1.bak`. El `.3mf` del catálogo
 laminado C sin el G-code (`slice_info` 335.26 g, 8 h 55): la tarjeta muestra la placa
 de 3.
 
+## 2026-11-24 (v3) — «llegó roto a la persona … más robustas las paredes» y «la curva se vea más parecido» a la foto de ML
+
+Feedback: una pieza llegó rota al cliente aunque viajó en bolsa de burbujas. Se rompió
+por la pared alta y las esquinas, por el borde de arriba y por los divisores. Además, la
+curva no se parecía a las fotos de MLM3713176381 (renders de 128 × 75 × 105).
+
+Medición de la foto de medidas (perspectiva corregida a ojo): la bajada va del ~14 % al
+~64 % del largo, con hombro redondo arriba, la parte más empinada a la mitad y panza
+cóncava abajo. El lado bajo mide ~0.58 del alto. La v2 bajaba en línea recta del
+18 % al 82 %, por eso se veía floja. El usuario: «la curva se ve más pronunciada en las
+fotos». Tamaño (decisión del usuario): se queda la planta de la v2 y se sube el alto
+a la proporción de la foto.
+
+Cambios contra v2 (precheck aprobado 11-24):
+- Borde `curva` = «s»: medio coseno de 0.14 a 0.64 del largo. La «recta» de v1-v2
+  sigue disponible como parámetro.
+- Alto 105 → 60 → **120 → 70**; planta 148 → **150**, esquinas 8 → **11**. Exterior
+  **152.4 × 92.4 × 120**: cabe en la caja 20×16×11 acostada (92.4 en los 110).
+- Pared en el valle 1.24 → **2.4** y `wall_loops` 1 → **2** (4 hilos macizos por lado y
+  lado, sin relleno dentro de la pared).
+- Labio: engorda **1.6 mm hacia adentro** en los 3 mm de arriba y baja a la pared en 4 mm
+  (volado menor a 45°).
+- Divisores 2 → **3 mm**, a 4 mm del borde (eran 10), con un **chaflán cóncavo de 3 mm**
+  contra la pared.
+- Huecos 46 / 47.7 / 47.8 × 87.5 → **46 / 46.6 / 46.6 × 85.2**; hondo 110 / 64 / 48.
+
+Laminado por CLI (Bambu Studio, P2S, placa de 3 con dos en fila y una girada; costo =
+g × 180 $/kg + $13.96, `.catalogo3d_costos.json` al 11-24):
+
+| Versión | Placa de 3 | Por pieza | Peso/pieza | Costo/pieza |
+|---|---|---|---|---|
+| v2 150 × 92 × 105, pared 1.24 | 8 h 55 · 335.3 g | 2 h 58 | 111.8 g | $34.08 |
+| **v3 152 × 92 × 120, pared 2.4, curva S** | **13 h 06 · 581.2 g** | **4 h 22** | **193.7 g** | **$48.83** |
+
+Filamento de la v3 por función: pared interior 40 %, pared exterior 38 %, sólido interno
+12 %, relleno 3.6 %. El 78 % es pared: el refuerzo es lo que pesa. El estimado antes de
+laminar era 165–180 g.
+
+Respaldos: `Portacontroles_Tejido.{3mf,png,stl}.v2.bak`. El `.3mf` del catálogo es el
+laminado sin el G-code (`slice_info` 581.19 g, 13 h 06).
+
 ## Pendiente
+- v3: imprimir y mandarla en la caja con burbuja (prueba de caída). Si sobra
+  resistencia, la palanca para bajar peso es el valle a 2.0 (sin tocar el labio ni los
+  divisores).
+- Publicación MLM3713176381: actualizar las medidas a 15.2 × 9.2 × 12 cm. Las fotos ya
+  traen la curva de la v3.
 - v2: imprimir y revisar que los techos de las losas no se hundan sobre el relleno rayo y
   que sin elevación en Z la boquilla no raye la textura. Si raya, regresar `z_hop` a 0.4.
-- Fotos y medidas de la publicación MLM3713176381 siguen siendo de la v1.
-- Imprimir: revisar que el valle de la textura salga macizo (una vuelta Arachne en 1.24),
-  que las cuentas se lean como en la foto y que el celular y los controles entren.
+- Imprimir: revisar que las cuentas se lean como en la foto y que el celular y los
+  controles entren.
 - Pedir medidas reales de controles gruesos y del celular (ver memoria portacontroles-mas-grande).
