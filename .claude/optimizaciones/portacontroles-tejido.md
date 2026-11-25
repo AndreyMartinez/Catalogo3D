@@ -121,10 +121,36 @@ laminar era 165–180 g.
 Respaldos: `Portacontroles_Tejido.{3mf,png,stl}.v2.bak`. El `.3mf` del catálogo es el
 laminado sin el G-code (`slice_info` 581.19 g, 13 h 06).
 
+## 2026-11-24 (v4) — «¿existe forma de que sea más rápido … y un poquito menos de peso sin perder la calidad?»
+
+Diagnóstico del G-code de la v3: a velocidad nominal la placa saldría en 6.8 h, pero el
+estimado de Bambu es 13 h 06. El tiempo lo manda acelerar y frenar en los tramitos de la
+textura (165 costillas × 6 puntos por vuelta), no la velocidad. Las paredes ya iban al
+tope de flujo (21 mm³/s ÷ 0.62 × 0.2 ≈ 169 mm/s). Palancas: menos capas, menos pared y
+más aceleración en la pared exterior.
+
+Variantes laminadas por CLI (placa de 3; costo = g × 180 $/kg + $13.96):
+
+| Variante | Placa de 3 | Por pieza | Peso/pieza | Costo/pieza |
+|---|---|---|---|---|
+| v3 (pared 2.4, capa 0.20) | 13 h 06 · 581.2 g | 4 h 22 | 193.7 g | $48.83 |
+| A: pared 2.0 | 12 h 19 · 541.9 g | 4 h 06 | 180.6 g | $46.47 |
+| B: capa 0.24 | 12 h 12 · 590.7 g | 4 h 04 | 196.9 g | $49.40 |
+| C: `outer_wall_acceleration` 6000 → 10000 | 12 h 28 · 581.2 g | 4 h 09 | 193.7 g | $48.83 |
+| **D = v4: A + B + C (el del catálogo)** | **10 h 43 · 552.4 g** | **3 h 34** | **184.1 g** | **$47.10** |
+
+Cambios contra v3: `valle` 2.4 → **2.0** (sigue con 4 hilos y 2 vueltas; 60 % más que la
+v2 que se rompió), `layer_height` 0.20 → **0.24** (una cuenta de 2.8 mm = 12 capas) y
+`outer_wall_acceleration` 6000 → **10000** (la textura tapa el eco). Labio, divisores y
+chaflanes no cambian. Huecos 46 / 47.4 / 47.4 × 86. Se descartaron la capa de 0.28 y la
+pared de 1 sola vuelta: cuestan calidad o resistencia.
+
+Respaldos: `Portacontroles_Tejido.{3mf,png,stl}.v3.bak`. El `.3mf` del catálogo es el
+laminado D sin el G-code (`slice_info` 552.43 g, 10 h 43).
+
 ## Pendiente
-- v3: imprimir y mandarla en la caja con burbuja (prueba de caída). Si sobra
-  resistencia, la palanca para bajar peso es el valle a 2.0 (sin tocar el labio ni los
-  divisores).
+- v4: imprimir y mandarla en la caja con burbuja (prueba de caída); revisar el
+  escalón de la capa 0.24 en la curva del borde.
 - Publicación MLM3713176381: actualizar las medidas a 15.2 × 9.2 × 12 cm. Las fotos ya
   traen la curva de la v3.
 - v2: imprimir y revisar que los techos de las losas no se hundan sobre el relleno rayo y

@@ -14,7 +14,7 @@ diagonal. Esquinas de 8 en planta para que la curva no le coma lugar a los
 huecos de las puntas.
 
 v3 (11-24): llegó roto en bolsa de burbujas (pared, borde y divisores).
-Pared de 2.4 con 2 vueltas, labio engrosado por dentro, divisores de 3 con
+Pared de 2.4 (2.0 desde la v4) con 2 vueltas, labio engrosado por dentro, divisores de 3 con
 chaflán contra la pared; y de vuelta la curva en S, medida de la foto de la
 publicación de ML, con el alto a su proporción (120 sobre 152).
 
@@ -59,8 +59,8 @@ P = {
     "curva_desde": 0.14,     # fracción del ancho donde empieza a bajar…
     "curva_hasta": 0.64,     # … y donde ya llegó abajo (v2 recta: .18 → .82)
     "redondeo_borde": 14.0,  # medio largo del redondeo en cada quiebre (recta)
-    "valle": 2.4,            # pared en el valle de la costilla: 4 hilos de
-                             # 0.62 con 2 vueltas (v2: 1.24, llegó roto)
+    "valle": 2.0,            # pared en el valle de la costilla: 4 hilos con
+                             # 2 vueltas (v2: 1.24, llegó roto; v3: 2.4)
     "labio_dentro": 1.6,     # el borde engorda hacia adentro…
     "labio_alto": 3.0,       # … en esta franja de arriba, y baja a la pared
     "labio_bajada": 4.0,     # en esta otra (volado de menos de 45°)
@@ -421,9 +421,13 @@ LAMINADO = {"wall_loops": "1", "wall_generator": "arachne",
             # sostiene los techos de las losas: −19 g y −20 min por pieza.
             "z_hop": "0", "retraction_minimum_travel": "3",
             "sparse_infill_pattern": "lightning"}
-# v3 (11-24): llegó roto en bolsa de burbujas. Pared de 2.4 en el valle con
+# v3 (11-24): llegó roto en bolsa de burbujas. Pared en el valle con
 # 2 vueltas por lado: 4 hilos macizos, sin relleno adentro de la pared.
-LAMINADO["wall_loops"] = "2"
+# v4: el tiempo lo manda acelerar y frenar en los tramitos de la textura, no
+# la velocidad; capa 0.24 (cuenta de 2.8 = 12 capas) y la pared exterior a
+# la aceleración del resto: −48 min por pieza.
+LAMINADO.update({"wall_loops": "2", "layer_height": "0.24",
+                 "outer_wall_acceleration": "10000"})
 
 
 def embeber_ajustes(ruta, ajustes):
