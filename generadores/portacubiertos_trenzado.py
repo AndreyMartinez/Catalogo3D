@@ -10,12 +10,13 @@ bandeja beige cuyo borde baja en las cinturas entre vaso y vaso.
     python3 portacubiertos_trenzado.py --salida /ruta --nombre MiPieza
     python3 portacubiertos_trenzado.py --costillas 18 --inclinacion 40
 
-El vaso no sale del motor (cuerpo.construir hace paredes cerradas): cada
-costilla es un sólido aparte, barrido en espiral, que se encima un poco en el
-anillo de la base y en el de la boca. El laminador une los sólidos encimados.
-Las rendijas son huecos de verdad; su techo es la cara de abajo de la costilla,
-que va inclinada lo mismo que la costilla (35° de la vertical por defecto),
-así que no lleva soportes.
+El vaso no sale del motor (cuerpo.construir hace paredes lisas). Desde la v12
+es una piel continua de `piel` mm que sigue las costillas de cordón por fuera
+y cierra el fondo de cada rendija: una sola isla por capa, sin retracciones
+entre costillas (8 h 05 → 5 h 55 el juego). Con `--cerrado 0` sale la v11:
+cada costilla es un sólido aparte, barrido en espiral, encimado en el anillo
+de la base y en el de la boca, y las rendijas son huecos de verdad. En los
+dos casos la costilla va inclinada 35° de la vertical: sin soportes.
 """
 
 import argparse
@@ -59,6 +60,10 @@ VASO = {
     "aro_fondo": 1.2,        # lo que se mete en las costillas, desde su cara
                              # de adentro (queda 0.6 bajo la orilla de la rendija)
     "capas": 0.5,            # mm entre secciones del barrido
+    "cerrado": 1,            # v12: la rendija lleva fondo y el vaso es una piel
+                             # continua que sigue las costillas (sin islas por
+                             # capa); 0 = costillas sueltas caladas (v11)
+    "piel": 1.8,             # grueso de esa piel (4 líneas de 0.42)
 }
 
 BANDEJA = {
@@ -161,6 +166,80 @@ def costilla(v, angulo0, z0, z1, puntos=13):
     return m.normalizar()
 
 
+def contorno_cerrado(v, z, por_costilla=40, por_rendija=6):
+    """Sección horizontal de la piel a la altura z: por fuera las costillas de
+    cordón y entre ellas el fondo de la rendija (al radio de su orilla); por
+    dentro, ese mismo contorno erosionado `piel` mm (cada punto de adentro
+    queda a `piel` de todo punto de afuera). Ángulos crecientes, los mismos
+    por fuera y por dentro."""
+    r_e, r_i = radio_ext(v, z), radio_int(v, z)
+    r_m = (r_e + r_i) / 2.0
+    n = v["costillas"]
+    paso = 2 * math.pi / n
+    hueco = v["rendija"] / math.cos(math.radians(v["inclinacion"])) / r_m
+    media = (paso - hueco) / 2.0
+    giro = -z * math.tan(math.radians(v["inclinacion"])) / r_m
+    piso = r_i + v["canto"]
+    fuera = []                                   # (ángulo, radio)
+    for j in range(n):
+        c = giro + paso * j
+        for k in range(por_costilla):
+            phi = -math.pi / 2 + math.pi * k / por_costilla
+            fuera.append((c + media * math.sin(phi), piso + v["panza"] * math.cos(phi)))
+        for k in range(por_rendija):
+            fuera.append((c + media + hueco * k / por_rendija, piso))
+    t = v["piel"]
+    xy = [(r * math.cos(a), r * math.sin(a)) for a, r in fuera]
+    total, ventana = len(fuera), t / piso * 1.2
+    dentro = []
+    for k, (a, r) in enumerate(fuera):
+        ux, uy = math.cos(a), math.sin(a)
+        rho = r - t
+        for paso_j in (1, -1):
+            j = k
+            while True:
+                j = (j + paso_j) % total
+                if j == k or abs(math.remainder(fuera[j][0] - a, 2 * math.pi)) > ventana:
+                    break
+                qx, qy = xy[j]
+                p = ux * qx + uy * qy
+                disc = p * p - (qx * qx + qy * qy) + t * t
+                if disc > 0:
+                    rho = min(rho, p - math.sqrt(disc))
+        dentro.append(rho)
+    return [(r * math.cos(a), r * math.sin(a)) for a, r in fuera], \
+           [(rho * math.cos(a), rho * math.sin(a)) for (a, _), rho in zip(fuera, dentro)]
+
+
+def piel_cerrada(v, z0, z1):
+    """La piel entre z0 y z1: secciones de contorno_cerrado unidas cara a
+    cara, con tapa de tira abajo y arriba."""
+    n_secc = max(2, int(math.ceil((z1 - z0) / v["capas"])) + 1)
+    m = M.Malla()
+    fuera, dentro = [], []
+    for i in range(n_secc):
+        z = z0 + (z1 - z0) * i / (n_secc - 1)
+        f, d = contorno_cerrado(v, z)
+        fuera.append([m.punto(x, y, z) for x, y in f])
+        dentro.append([m.punto(x, y, z) for x, y in d])
+    n = len(fuera[0])
+    for i in range(n_secc - 1):
+        a, b, ai, bi = fuera[i], fuera[i + 1], dentro[i], dentro[i + 1]
+        for k in range(n):
+            k2 = (k + 1) % n
+            m.quad(a[k], a[k2], b[k2], b[k])
+            m.quad(ai[k], bi[k], bi[k2], ai[k2])
+    o, d = fuera[0], dentro[0]
+    for k in range(n):
+        k2 = (k + 1) % n
+        m.quad(o[k], d[k], d[k2], o[k2])
+    o, d = fuera[-1], dentro[-1]
+    for k in range(n):
+        k2 = (k + 1) % n
+        m.quad(o[k], o[k2], d[k2], d[k])
+    return m.normalizar()
+
+
 def vaso(v):
     h, zs, aro = v["alto"], v["zocalo"], v["aro"]
     m = M.Malla()
@@ -183,6 +262,11 @@ def vaso(v):
         (radio_int(v, za), za), (radio_ext(v, za) - 0.4, za),
         (radio_ext(v, h) - 0.4, h - 0.8), (radio_ext(v, h) - 1.2, h),
         (radio_int(v, h) + 0.4, h), (radio_int(v, h), h - 0.4)]))
+    if v["cerrado"]:
+        # Piel continua, encimada 0.6 mm en zócalo y boca. Ya no hacen falta
+        # aros: ninguna costilla queda suelta.
+        m.unir(piel_cerrada(v, zs - 0.6, za + 0.6))
+        return m
     # Aros por dentro, repartidos parejo entre zócalo y boca. Se meten en las
     # orillas de las costillas y cruzan las rendijas por detrás; los chaflanes
     # a 45° los hacen imprimibles sin soporte y no dejan repisa donde se

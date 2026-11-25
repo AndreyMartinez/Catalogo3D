@@ -163,10 +163,46 @@ Juego (CLI), costo = g × 180 $/kg + $13.96:
 | C: B + 3 paredes en vasos | 9 h 16 | 287.5 g | $65.70 |
 | D: B + 4 paredes en vasos | 9 h 25 | 291.9 g | $66.49 |
 
+## 2026-11-24 (v12) — «optimizar el peso, que sea más rápido… sin que sea frágil, paredes muy lisas»
+También pidió 2 juegos por plato si se podía. Respaldo: `Portacubiertos_Trenzado.{3mf,png,stl}.v11.bak`.
+Aprobado con el precheck («Apruebo la A»).
+
+Diagnóstico (CLI de la v11): de las 8 h 05, **3.4 h eran viajes + retracciones**
+(Travel 6 074 s + Undefined 6 071 s): cada costilla es una isla por capa, ~68 000
+retracciones por vaso (bandeja 6 300). Vaso 82.4 g, bandeja 92.1 g. Esas 16 costuras por
+capa en las costillas son también lo que se ve «impreso».
+
+Cambio: `cerrado` = 1, `piel` = 1.8. El vaso es una piel continua que por fuera es igual
+(cordón de `panza` 4 sobre la orilla) y cierra cada rendija con un fondo al radio de su
+orilla; por dentro es el contorno de afuera erosionado 1.8 mm (`contorno_cerrado`, 0
+aristas sueltas). Sin aros por dentro: ya no hay costillas sueltas. La costura «aligned» cae
+sola en el fondo de una rendija. Ya no se ve a través de la rendija; el agua sale por los
+agujeros del piso.
+
+Resistencia: plástico por capa en un vaso, medido en el G-code arriba de la bandeja
+(66–94 mm, mediana): v10 (la que se rompió) **370 mm²**, 16 láminas sueltas · v11 567,
+sueltas atadas por 2 aros · **v12 521, un solo anillo corrugado (+41 % sobre la v10)** ·
+piel 2.1 604 · piel 2.4 686.
+
+Juego (CLI), costo = g × 180 $/kg + $13.96:
+
+| Versión | Tiempo | Peso | Costo |
+|---|---|---|---|
+| v10 (se rompía) | 6 h 33 | 211.8 g | $52.09 |
+| v11 | 8 h 05 | 261.2 g | $60.97 |
+| **v12 — A: piel continua 1.8 (elegida)** | **5 h 55** | **245.0 g** | **$58.07** |
+| piel 2.1 | 6 h 46 | 265.5 g | $61.76 |
+| piel 2.4 (relleno sólido entre líneas) | 6 h 58 | 282.3 g | $64.77 |
+
+**2 juegos por plato: no caben** sin achicar el producto. Dos bandejas ocupan 196 × 202 mm
+del plato de 256 y quedan 54 mm, el vaso mide 92. Lo que sí: 2 juegos en 11 h 50 (antes
+16 h 10); si conviene, un plato de 4 vasos y otro de 2 bandejas.
+
 ## Pendiente / conocido
-- **Imprimir la v11** y confirmar que ya no se truenan. Si todavía se parte en anillo,
-  lo siguiente es adhesión entre capas (temperatura de boquilla +10 °C o menos
-  ventilador en los vasos), no más geometría.
+- **Imprimir un vaso v12** y apretarlo / dejarlo caer antes de producir. Si todavía se parte
+  en anillo, lo siguiente es adhesión entre capas (temperatura de boquilla +10 °C o menos
+  ventilador en los vasos), no más geometría; la piel de 2.1 cuesta más que la v11.
+- La bandeja (92 g, pared 4.5 al 10 %) no se tocó en la v12.
 - Sin z-hop se ahorrarían 17 min por vaso, 51 por juego, pero la boquilla podría
   raspar las costillas: no se aplicó.
 - Vaso de 80 mm (v9) 49.3 g laminado; la suma de sólidos del script sobreestima.
