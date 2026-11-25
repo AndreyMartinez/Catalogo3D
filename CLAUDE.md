@@ -44,7 +44,10 @@ galería, el motor o un skill, propón `sdd`; si es una tarea puntual, hazla.
   de vistas desde todos los lados de un `.3mf`/`.stl`. Si todavía no está en tu
   checkout, vive en la copia de trabajo principal sin versionar.
   `fotos_gemini.py` genera fotos de producto con Gemini a partir de un render
-  (llave en `~/.catalogo3d/gemini_key`, nunca en el repo).
+  (llave en `~/.catalogo3d/gemini_key`, nunca en el repo); `logo_gemini.py`,
+  variantes de logo e imágenes de marca con la misma llave.
+- `marca/` — logo oficial (Arepo en sello, «Sembrar con amor · crecer con
+  paciencia»), colores e imágenes de Mi página de MercadoLibre; `README.md` primero.
 
 ### Conocimiento versionado (`.claude/`)
 
