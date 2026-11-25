@@ -198,8 +198,41 @@ Juego (CLI), costo = g × 180 $/kg + $13.96:
 del plato de 256 y quedan 54 mm, el vaso mide 92. Lo que sí: 2 juegos en 11 h 50 (antes
 16 h 10); si conviene, un plato de 4 vasos y otro de 2 bandejas.
 
+## 2026-11-25 (v13) — «a los dos vasos (más el izquierdo) les quedaron salidas como hilos sueltos por los lados»
+Impreso: v12. Lo mismo que el Torsión v3. Respaldo: `Portacubiertos_Trenzado.{3mf,png,stl}.v12.bak`
+(la malla no cambió; solo `model_settings.config`).
+
+Diagnóstico (G-code por CLI, midiendo cuánto de cada salto va por fuera del plástico, capas
+66–99): con `seam_position` «aligned», la pared que da afuera y la que da adentro alinean su
+costura cada una por su lado y quedan en lados opuestos. En **cada capa la boquilla cruzaba
+el interior del vaso por el aire (30–64 mm)**, además del paso al otro vaso: 2 saltos largos
+por capa y vaso, ~1 000 por vaso. Cada uno arranca de la pared de afuera y deja un pelito en
+el costado. En el vaso izquierdo esos arranques caían repartidos por su costado de afuera
+(120–240° y 330°), a la vista; en el derecho, casi todos del lado del otro vaso. Por eso el
+izquierdo se ve peor. Los dos vasos son la misma malla y el mismo laminado.
+
+Cambio: `seam_position` = **back** por objeto en los vasos (`POR_OBJETO["vaso"]`). Las dos
+costuras quedan juntas atrás (+y = espalda alta de la bandeja) y el salto solo atraviesa la
+piel de 1.8 mm. Queda un salto por capa, el paso de un vaso al otro, que sale siempre de la
+costura de atrás.
+
+| Juego (CLI) | Tiempo | Peso | Saltos por el aire por capa y vaso | Cruce del interior |
+|---|---|---|---|---|
+| v12 (aligned) | 5 h 54 | 245.0 g | 2 | sí, 30–64 mm |
+| **v13 (back en vasos)** | **5 h 51** | **245.0 g** | **1** (paso al otro vaso, desde atrás) | no |
+| nearest en vasos | 5 h 49 | 245.0 g | 1 | no (costuras sueltas) |
+
+Costo sin cambio: $58.07 por juego. Probadas y descartadas: `reduce_crossing_wall` por objeto
+(Bambu lo ignora; global: +25 min y peor en la bandeja), `wall_sequence` outer/inner (no quita
+el cruce). No se bajó la temperatura: la v11 se partía en anillo.
+
+**Impresa (11-25): «funcionó»**, sin los pelitos en los costados.
+
+Torsión v4 revisado con lo mismo: costura atrás + `reduce_crossing_wall` desde el 11-24, solo
+el paso de una pieza a otra por capa; sin cruces del interior.
+
 ## Pendiente / conocido
-- **Imprimir un vaso v12** y apretarlo / dejarlo caer antes de producir. Si todavía se parte
+- v13 impresa sin pelitos (11-25). Falta apretar / dejar caer un vaso para confirmar resistencia / dejarlo caer antes de producir. Si todavía se parte
   en anillo, lo siguiente es adhesión entre capas (temperatura de boquilla +10 °C o menos
   ventilador en los vasos), no más geometría; la piel de 2.1 cuesta más que la v11.
 - La bandeja (92 g, pared 4.5 al 10 %) no se tocó en la v12.

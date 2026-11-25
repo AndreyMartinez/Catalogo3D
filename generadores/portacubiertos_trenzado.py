@@ -482,7 +482,15 @@ DE_FABRICA = {"sparse_infill_density", "skeleton_infill_density",
 # casi todas). En la v9–v10 se puso el área mínima en 0 para que llevaran
 # relleno ligero entre sus dos paredes (−5 g y −26 min por vaso), pero impresas
 # se tronaban y el vaso se partía en anillo: se regresó (v11, 11-22).
-POR_OBJETO = {"bandeja": {"sparse_infill_density": "10%"}}
+#
+# Costura de los vasos atrás (v13, 11-25): con «aligned» la pared de afuera y la
+# de adentro alinean su costura cada una por su lado, en lados opuestos, y en
+# cada capa la boquilla cruzaba el vaso por el aire (30–64 mm). Cada cruce
+# dejaba un pelito en el costado: «hilos sueltos por los lados». Atrás (+y, la
+# espalda alta de la bandeja) las dos costuras quedan juntas y el salto solo
+# atraviesa la piel. «evitar cruzar paredes» por objeto lo ignora Bambu.
+POR_OBJETO = {"bandeja": {"sparse_infill_density": "10%"},
+              "vaso": {"seam_position": "back"}}
 
 
 def modelo_settings(modelo):
