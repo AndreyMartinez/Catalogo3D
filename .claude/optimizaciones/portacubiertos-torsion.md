@@ -146,3 +146,41 @@ Respaldos: `.3mf.v3.bak`, `.png.v3.bak`.
 
 **Pendiente:** imprimir y ver si quedan hilos. Si sí: secar el filamento (50 °C 6–8 h), luego
 `retraction_length` 0.8 → 1.0. Si se vuelve a escalar a mano, regenerar con el generador.
+
+## 2026-11-25 (v5) — "quiero que las paredes sean lisas bonitas, y que no se le salgan hilos"
+
+**Feedback:** fotos de la impresión en negro: franja vertical de pelitos a media cara larga
+(por fuera) y algunos en el canto. El usuario no sabía si había impreso la v4; el archivo del
+catálogo sí era la v4 (guardado 11-24 15:58), y la franja cae justo donde la v4 pone la
+costura `back`, así que lo más probable es que fuera la v4.
+
+**Diagnóstico** (G-code de la v4 por CLI, `hilos.py` en el scratchpad de la sesión: mide cada
+salto contra el polígono de la pared exterior de su capa, con arcos G2/G3):
+- Dentro de cada pieza, limpio: los únicos cruces de compartimento son en el piso (z < 10).
+- **Entre piezas, no:** con 3 por plato, en cada una de las 446 capas la boquilla termina la
+  pieza en la *pared de afuera* (1,301 de 1,338 saltos) y brinca 160–240 mm a la siguiente.
+  Cada despegue desde la cara visible deja un pelito; apilados en el mismo punto (costura
+  back = centro de la cara larga de atrás) forman la franja.
+- Imprimir por objeto no se puede: 89 mm de alto contra `extruder_clearance_height_to_rod`
+  32.5 de la P2S.
+
+**Cambios v4 → v5** (solo perfil, malla y `model_settings.config` idénticos; todas en
+`different_settings_to_system`):
+- `wall_sequence` inner wall/outer wall → **inner-outer-inner wall**: cada pieza termina en
+  una pared interior y el salto sale desde dentro del grosor. Despegues desde la pared de
+  afuera: 1,301 → **2**.
+- `seam_slope_type` none → **external** + `override_filament_scarf_seam_setting` 1 (costura
+  en rampa; verificado: 212k extrusiones con Z variable en el G-code).
+
+| CLI Bambu, plato de 3 | v4 | B (solo orden) | **v5 = D** (orden + rampa) |
+|---|---|---|---|
+| Tiempo del plato | 7 h 41 | 7 h 49 | **7 h 58** |
+| Por pieza | 2 h 34 · 129.3 g | 2 h 36 · 129.3 g | **2 h 39 · 129.3 g** |
+| Costo por pieza (180 $/kg + $13.96) | $37.23 | $37.23 | **$37.23** |
+| Despegues desde la cara de afuera | 1,301 | 2 | 2 |
+
+Probado y descartado: z-hop 0.8 en espiral (C) no cambia dónde despega y suma 20 min más.
+Respaldos: `.3mf.v4.bak`, `.png.v4.bak` (miniatura igual: la forma no cambió).
+
+**Pendiente:** imprimir y mandar foto. Si quedan pelitos *repartidos* (no en franja):
+filamento húmedo → secar 50 °C 6–8 h; después `retraction_length` 0.8 → 1.0.
